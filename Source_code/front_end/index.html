@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fairmeet</title>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      html, body { height: 100%; margin: 0; }
+      #map { height: 100%; width: 100%; }
+
+      .panel {
+        position: absolute;
+        z-index: 999;
+        top: 12px;
+        left: 12px;
+        background: white;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+        max-width: 280px;
+      }
+      .panel h1 {
+        font-size: 16px;
+        margin: 0 0 6px 0;
+      }
+      .panel p {
+        margin: 6px 0;
+        font-size: 13px;
+        opacity: 0.8;
+      }
+      .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+      button {
+        border: 1px solid #ddd;
+        background: #f7f7f7;
+        padding: 6px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      button:hover { background: #efefef; }
+      .stat { font-size: 13px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    </style>
+  </head>
+
+  <body>
+    <div class="panel">
+      <h1>Fairmeet</h1>
+      <p>Click the map to add people. Midpoint updates automatically.</p>
+      <div class="row">
+        <button id="resetBtn">Reset</button>
+      </div>
+      <p class="stat">People: <span id="count" class="mono">0</span></p>
+      <p class="stat">Midpoint: <span id="mid" class="mono">—</span></p>
+
+      <p class="stat">Recommendation: <span id="rec" class="mono">—</span></p>
+
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ---------- Setup ----------
+  const map = L.map("map").setView([42.355, -71.105], 12); // Boston-ish
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+
+  // ---------- State ----------
+  /** @type {{lat:number,lng:number, marker:any}[]} */
+  const people = [];
+  let midpointMarker = null;
+  let linesLayer = L.layerGroup().addTo(map);
+
+  const countEl = document.getElementById("count");
+  const midEl = document.getElementById("mid");
+  const resetBtn = document.getElementById("resetBtn");
+  const recEl = document.getElementById("rec");
+
+  /* ===== ADDED START ===== */
+  // Separate layer for backend demo markers
+  const demoLayer = L.layerGroup().addTo(map);
+  /* ===== ADDED END ===== */
+
+
+  // ---------- Core logic ----------
+  function centroid(points) {
+    const n = points.length;
+    let sumLat = 0, sumLng = 0;
+    for (const p of points) {
+      sumLat += p.lat;
+      sumLng += p.lng;
+    }
+    return { lat: sumLat / n, lng: sumLng / n };
+  }
+
+  function updateUI() {
+    countEl.textContent = String(people.length);
+    if (!midpointMarker) {
+      midEl.textContent = "—";
+    } else {
+      const { lat, lng } = midpointMarker.getLatLng();
+      midEl.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+  }
+
+  function redrawMidpointAndLines() {
+    linesLayer.clearLayers();
+    if (midpointMarker) {
+      map.removeLayer(midpointMarker);
+      midpointMarker = null;
+    }
+
+    if (people.length === 0) {
+      updateUI();
+      return;
+    }
+
+    const mid = centroid(people.map(p => ({ lat: p.lat, lng: p.lng })));
+
+    midpointMarker = L.marker([mid.lat, mid.lng], {
+      title: "Midpoint",
+    }).addTo(map);
+
+    midpointMarker.bindPopup("<b>Midpoint</b>").openPopup();
+
+    for (const p of people) {
+      const line = L.polyline([[p.lat, p.lng], [mid.lat, mid.lng]], {
+        weight: 2,
+        opacity: 0.7,
+      });
+      line.addTo(linesLayer);
+    }
+
+    updateUI();
+  }
+
+  // ---------- Map interactions ----------
+  map.on("click", (e) => {
+    const { lat, lng } = e.latlng;
+
+    const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    marker.bindPopup(`<b>Person ${people.length + 1}</b>`);
+
+    const person = { lat, lng, marker };
+    people.push(person);
+
+    marker.on("dragend", () => {
+      const pos = marker.getLatLng();
+      person.lat = pos.lat;
+      person.lng = pos.lng;
+      redrawMidpointAndLines();
+    });
+
+    redrawMidpointAndLines();
+  });
+
+  resetBtn.addEventListener("click", () => {
+    for (const p of people) map.removeLayer(p.marker);
+    people.length = 0;
+
+    linesLayer.clearLayers();
+    if (midpointMarker) {
+      map.removeLayer(midpointMarker);
+      midpointMarker = null;
+    }
+
+    updateUI();
+  });
+
+  updateUI();
+
+
+
+  
+  // --------- Load backend demo and render recommended venue ----------
+  async function loadDemoAndRender() {
+    const res = await fetch("/api/demo");
+    const data = await res.json();
+
+    demoLayer.clearLayers();
+
+    // Add demo people markers
+    data.people.forEach((p, i) => {
+      L.marker([p.lat, p.lng])
+        .addTo(demoLayer)
+        .bindPopup(`<b>${p.name}</b><br/>Person ${i + 1}`);
+    });
+
+    // Add recommended venue marker
+    const v = data.best_venue;
+
+    L.marker([v.lat, v.lng])
+      .addTo(demoLayer)
+      .bindPopup(
+        `<b>Recommended</b><br/>
+         ${v.name}<br/>
+         Activity: ${data.activity}<br/>
+         Max distance: ${v.max_distance_km} km`
+      )
+      .openPopup();
+
+    // Update panel text
+    if (recEl) {
+      recEl.textContent =
+        `${data.activity} @ ${v.name} (max ${v.max_distance_km} km)`;
+    }
+
+    // Zoom map nicely
+    const bounds = L.latLngBounds([]);
+    data.people.forEach(p => bounds.extend([p.lat, p.lng]));
+    bounds.extend([v.lat, v.lng]);
+    map.fitBounds(bounds.pad(0.25));
+  }
+
+  // Auto-run once page loads
+  loadDemoAndRender();
+  /* ===== ADDED END ===== */
+
+</script>
+
+  </body>
+</html>
