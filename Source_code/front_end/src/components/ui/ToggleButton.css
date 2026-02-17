@@ -1,0 +1,47 @@
+/* src/components/ui/ToggleButton.css */
+.toggle-button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.toggle-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.toggle-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-weight: 500;
+    border: 2px solid #d1d1d1;
+    border-radius: 6px;
+    background-color: white;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.toggle-btn:hover {
+    border-color: #999;
+}
+
+.toggle-btn.active {
+    background-color: #2d2d2d;
+    border-color: #2d2d2d;
+    color: white;
+}
+
+.toggle-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(45, 45, 45, 0.1);
+}

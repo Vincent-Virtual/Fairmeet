@@ -1,0 +1,41 @@
+/* src/components/Header.css */
+.header {
+    background-color: white;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: #1a1a1a;
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.logo-icon {
+    width: 32px;
+    height: 32px;
+    background-color: #2d2d2d;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.logo-text {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
