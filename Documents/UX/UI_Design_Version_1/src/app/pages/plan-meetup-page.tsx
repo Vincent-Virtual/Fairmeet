@@ -64,9 +64,37 @@ export function PlanMeetupPage() {
     setParticipants(participants.filter((p) => p.id !== id));
   };
 
-  const handleGeneratePlan = () => {
-    navigate("/results");
+
+
+
+  // const handleGeneratePlan = () => {
+  //   navigate("/results");
+  // };
+
+  // modify handleGeneratePlan
+  const handleGeneratePlan = async () => {
+  const payload = {
+    meetupName,
+    preferredArea,
+    budget,
+    activityType,
+    participants,
   };
+
+  const res = await fetch("/api/plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+
+  navigate("/results", { state: data });
+};
+
+
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col">
