@@ -67,30 +67,30 @@ export function PlanMeetupPage() {
 
 
 
-  // const handleGeneratePlan = () => {
-  //   navigate("/results");
-  // };
-
-  // modify handleGeneratePlan
-  const handleGeneratePlan = async () => {
-  const payload = {
-    meetupName,
-    preferredArea,
-    budget,
-    activityType,
-    participants,
+  const handleGeneratePlan = () => {
+    navigate("/results");
   };
 
-  const res = await fetch("/api/plan", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  // modify handleGeneratePlan
+//   const handleGeneratePlan = async () => {
+//   const payload = {
+//     meetupName,
+//     preferredArea,
+//     budget,
+//     activityType,
+//     participants,
+//   };
 
-  const data = await res.json();
+//   const res = await fetch("/api/plan", {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify(payload),
+//   });
 
-  navigate("/results", { state: data });
-};
+//   const data = await res.json();
+
+//   navigate("/results", { state: data });
+// };
 
 
 
