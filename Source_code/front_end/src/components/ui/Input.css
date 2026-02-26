@@ -1,44 +1,189 @@
 /* src/components/ui/Input.css */
+
+/**
+ * Input Component Styles
+ * Clean, minimal design with gradient focus states
+ */
+
+/* ========================================
+   INPUT GROUP CONTAINER
+   ======================================== */
+
 .input-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--spacing-2);
+    width: 100%;
 }
 
+/* ========================================
+   LABEL
+   ======================================== */
+
 .input-label {
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: #1a1a1a;
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    color: var(--color-text-primary);
+    line-height: var(--leading-tight);
 }
 
 .required-indicator {
-    color: #e74c3c;
-    margin-left: 0.25rem;
+    color: var(--color-error);
+    margin-left: var(--spacing-1);
+    font-weight: var(--font-bold);
 }
+
+/* ========================================
+   INPUT FIELD
+   ======================================== */
 
 .input-field {
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-    border: 1px solid #d1d1d1;
-    border-radius: 6px;
-    font-family: inherit;
-    transition: all 0.2s ease;
-    background-color: white;
+    /* Layout */
+    width: 100%;
+    height: var(--input-height);
+    padding: var(--input-padding-y) var(--input-padding-x);
+
+    /* Typography */
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--color-text-primary);
+
+    /* Appearance */
+    background-color: var(--color-white);
+    border: var(--input-border-width) solid var(--color-border);
+    border-radius: var(--input-border-radius);
+
+    /* Transitions */
+    transition: all var(--transition-base);
+
+    /* Remove default styles */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
 }
 
+/* Placeholder */
+.input-field::placeholder {
+    color: var(--color-text-tertiary);
+    opacity: 1;
+}
+
+/* Hover State */
+.input-field:hover:not(:disabled):not(:focus) {
+    border-color: var(--color-gray-300);
+}
+
+/* Focus State - Gradient border effect */
 .input-field:focus {
     outline: none;
-    border-color: #2d2d2d;
-    box-shadow: 0 0 0 3px rgba(45, 45, 45, 0.1);
+    border-color: var(--color-primary-500);
+    box-shadow: var(--input-focus-ring);
+    background-color: var(--color-white);
 }
 
-.input-field::placeholder {
-    color: #999;
+/* Disabled State */
+.input-field:disabled {
+    background-color: var(--color-gray-100);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
 }
+
+/* Read-only State */
+.input-field:read-only {
+    background-color: var(--color-gray-50);
+    cursor: default;
+}
+
+/* Error State */
+.input-field.error {
+    border-color: var(--color-error);
+}
+
+.input-field.error:focus {
+    border-color: var(--color-error);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Success State */
+.input-field.success {
+    border-color: var(--color-success);
+}
+
+.input-field.success:focus {
+    border-color: var(--color-success);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* ========================================
+   HELPER TEXT
+   ======================================== */
 
 .input-helper-text {
-    font-size: 0.875rem;
-    color: #666;
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    line-height: var(--leading-normal);
     margin: 0;
+}
+
+.input-helper-text.error {
+    color: var(--color-error);
+}
+
+.input-helper-text.success {
+    color: var(--color-success);
+}
+
+/* ========================================
+   INPUT VARIATIONS
+   ======================================== */
+
+/* Textarea */
+.input-field.textarea {
+    height: auto;
+    min-height: 120px;
+    resize: vertical;
+    padding: var(--spacing-3) var(--input-padding-x);
+    line-height: var(--leading-relaxed);
+}
+
+/* Search Input */
+.input-field.search {
+    padding-left: var(--spacing-10);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: var(--spacing-3) center;
+    background-size: 20px;
+}
+
+/* ========================================
+   INPUT WITH ICON
+   ======================================== */
+
+.input-with-icon {
+    position: relative;
+}
+
+.input-icon {
+    position: absolute;
+    left: var(--spacing-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-tertiary);
+    pointer-events: none;
+}
+
+.input-with-icon .input-field {
+    padding-left: var(--spacing-10);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .input-field {
+        font-size: var(--text-base);
+    }
 }

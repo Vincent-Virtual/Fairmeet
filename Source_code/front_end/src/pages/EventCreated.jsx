@@ -1,21 +1,18 @@
 // src/pages/EventCreated.jsx
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import Button from '../components/ui/Button';
 import './EventCreated.css';
 
-/**
- * EventCreated Page Component (Function Component)
- * Displays the generated event code and sharing options
- */
 function EventCreated() {
     const { eventCode } = useParams();
     const navigate = useNavigate();
+
     const [copied, setCopied] = useState(false);
     const [meetupData, setMeetupData] = useState(null);
 
-    // Load meetup data from localStorage
     useEffect(() => {
         const data = localStorage.getItem(`meetup_${eventCode}`);
         if (data) {
@@ -23,14 +20,12 @@ function EventCreated() {
         }
     }, [eventCode]);
 
-    // Copy event code to clipboard
     const handleCopyCode = () => {
         navigator.clipboard.writeText(eventCode);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Copy share link to clipboard
     const handleCopyLink = () => {
         const shareLink = `${window.location.origin}/join/${eventCode}`;
         navigator.clipboard.writeText(shareLink);
@@ -38,12 +33,10 @@ function EventCreated() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Navigate to results (for testing)
     const handleViewResults = () => {
         navigate(`/results/${eventCode}`);
     };
 
-    // Go back to home
     const handleNewMeetup = () => {
         navigate('/');
     };
@@ -54,15 +47,11 @@ function EventCreated() {
 
             <main className="event-created-main">
                 <div className="event-created-container">
-                    {/* Success icon */}
+                    {/* Success icon - Heroicon au lieu de SVG custom */}
                     <div className="success-icon">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="#2d2d2d" strokeWidth="2"/>
-                            <path d="M8 12l2 2 4-4" stroke="#2d2d2d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                        <CheckCircleIcon className="success-icon-svg" />
                     </div>
 
-                    {/* Success message */}
                     <h1 className="success-title">Meetup Created!</h1>
                     <p className="success-subtitle">
                         Share this code with participants so they can join
@@ -74,7 +63,7 @@ function EventCreated() {
                         <div className="code-display">
                             <span className="code-text">{eventCode}</span>
                             <button className="copy-button" onClick={handleCopyCode}>
-                                {copied ? 'Copied!' : 'Copy'}
+                                {copied ? '✓ Copied' : 'Copy'}
                             </button>
                         </div>
                     </div>
@@ -106,10 +95,10 @@ function EventCreated() {
                         </div>
                     </div>
 
-                    {/* Actions */}
+                    {/* Actions - Sans emojis */}
                     <div className="event-actions">
-                        <Button variant="primary" size="large" onClick={handleViewResults}>
-                            Join as a Participant
+                        <Button variant="primary" size="large" onClick={handleViewResults} className="btn-cta">
+                            View Results (Demo)
                         </Button>
                         <Button variant="secondary" size="large" onClick={handleNewMeetup}>
                             Create New Meetup

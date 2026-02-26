@@ -1,69 +1,212 @@
 /* src/components/ui/Button.css */
+
+/**
+ * Button Component Styles
+ * SOLID BLUE design with special CTA gradient
+ */
+
+/* ========================================
+   BASE BUTTON STYLES
+   ======================================== */
+
 .btn {
-    padding: 0.75rem 2rem;
-    font-size: 1rem;
-    font-weight: 500;
-    border-radius: 6px;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-family: inherit;
+    /* Layout */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: var(--spacing-2);
+
+    /* Typography */
+    font-family: var(--font-sans);
+    font-weight: var(--font-semibold);
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+
+    /* Appearance */
+    border: none;
+    border-radius: var(--radius-xl);
+    cursor: pointer;
+    user-select: none;
+
+    /* Transitions */
+    transition: all var(--transition-base);
+
+    /* Remove default button styles */
+    background: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
 }
 
-/* Primary button - Black background */
-.btn-primary {
-    background-color: #2d2d2d;
-    color: white;
-    border-color: #2d2d2d;
+.btn:focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
 }
 
-.btn-primary:hover {
-    background-color: #1a1a1a;
-    border-color: #1a1a1a;
-}
-
-.btn-primary:active {
-    transform: scale(0.98);
-}
-
-/* Secondary button - White background with black border */
-.btn-secondary {
-    background-color: white;
-    color: #2d2d2d;
-    border-color: #2d2d2d;
-}
-
-.btn-secondary:hover {
-    background-color: #f5f5f5;
-}
-
-.btn-secondary:active {
-    transform: scale(0.98);
-}
-
-/* Disabled state */
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none !important;
+    box-shadow: none !important;
 }
 
-/* Sizes */
+/* ========================================
+   PRIMARY VARIANT - SOLID BLUE
+   ======================================== */
+
+.btn-primary {
+    background: var(--color-primary-500);  /* ✅ SOLID BLUE */
+    color: var(--color-text-on-primary);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-600);  /* Darker blue on hover */
+    box-shadow: var(--shadow-primary-lg);
+    transform: translateY(-2px);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+    background: var(--color-primary-700);
+}
+
+/* ========================================
+   CTA VARIANT - GRADIENT (Special button only)
+   ======================================== */
+
+.btn-cta {
+    background: var(--gradient-cta);  /* ✅ ONLY CTA has gradient */
+    color: var(--color-text-on-primary);
+    box-shadow: var(--shadow-primary);
+    font-weight: var(--font-bold);
+}
+
+.btn-cta:hover:not(:disabled) {
+    background: var(--gradient-cta-hover);
+    box-shadow: var(--shadow-primary-lg);
+    transform: translateY(-2px);
+}
+
+.btn-cta:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: var(--shadow-md);
+}
+
+/* ========================================
+   SECONDARY VARIANT - Outline
+   ======================================== */
+
+.btn-secondary {
+    background-color: var(--color-white);
+    color: var(--color-primary-600);
+    border: 2px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-gray-50);
+    border-color: var(--color-primary-500);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.btn-secondary:active:not(:disabled) {
+    transform: translateY(0);
+    background-color: var(--color-gray-100);
+}
+
+/* ========================================
+   GHOST VARIANT - Transparent
+   ======================================== */
+
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-primary-600);
+}
+
+.btn-ghost:hover:not(:disabled) {
+    background-color: var(--color-gray-100);
+}
+
+.btn-ghost:active:not(:disabled) {
+    background-color: var(--color-gray-200);
+}
+
+/* ========================================
+   SIZES
+   ======================================== */
+
 .btn-small {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
+    height: var(--button-height-sm);
+    padding: 0 var(--spacing-4);
+    font-size: var(--text-sm);
+    border-radius: var(--radius-lg);
 }
 
 .btn-medium {
-    padding: 0.75rem 2rem;
-    font-size: 1rem;
+    height: var(--button-height-md);
+    padding: 0 var(--spacing-6);
+    font-size: var(--text-base);
 }
 
 .btn-large {
-    padding: 1rem 2.5rem;
-    font-size: 1.125rem;
+    height: var(--button-height-lg);
+    padding: 0 var(--spacing-8);
+    font-size: var(--text-lg);
+}
+
+/* ========================================
+   FULL WIDTH
+   ======================================== */
+
+.btn-full {
+    width: 100%;
+}
+
+/* ========================================
+   LOADING STATE
+   ======================================== */
+
+.btn-loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 0.6s linear infinite;
+}
+
+/* ========================================
+   ICON BUTTONS
+   ======================================== */
+
+.btn-icon {
+    padding: 0;
+    aspect-ratio: 1;
+}
+
+.btn-icon.btn-small {
+    width: var(--button-height-sm);
+}
+
+.btn-icon.btn-medium {
+    width: var(--button-height-md);
+}
+
+.btn-icon.btn-large {
+    width: var(--button-height-lg);
 }

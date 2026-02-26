@@ -1,94 +1,130 @@
 /* src/pages/CreateMeetup.css */
+
+/**
+ * CreateMeetup Page Styles
+ * Form with SOLID BLUE hero section
+ */
+
+/* ========================================
+   PAGE CONTAINER
+   ======================================== */
+
 .create-meetup-page {
     min-height: 100vh;
-    background-color: #f5f5f5;
+    background-color: var(--color-background);
 }
 
 .create-meetup-main {
-    padding: 3rem 2rem;
+    padding: var(--spacing-8) var(--container-padding);
     display: flex;
     justify-content: center;
+    min-height: calc(100vh - var(--header-height));
 }
 
 .create-meetup-container {
-    max-width: 600px;
+    max-width: 700px;
     width: 100%;
+    animation: fadeIn 0.5s var(--ease-out);
 }
 
-/* Page header */
-.page-header {
+/* ========================================
+   PAGE HERO - SOLID BLUE
+   ======================================== */
+
+.page-hero {
+    background: var(--color-primary-500);  /* ✅ SOLID BLUE */
+    padding: var(--spacing-12) var(--spacing-8);
+    border-radius: var(--radius-3xl) var(--radius-3xl) 0 0;
     text-align: center;
-    margin-bottom: 2.5rem;
+    color: var(--color-white);
+    animation: slideInDown 0.6s var(--ease-out);
+    box-shadow: var(--shadow-primary);
 }
 
-.page-title {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin-bottom: 0.5rem;
+.page-hero-title {
+    font-size: var(--text-4xl);
+    font-weight: var(--font-extrabold);
+    color: var(--color-white);
+    margin-bottom: var(--spacing-3);
+    line-height: var(--leading-tight);
 }
 
-.page-subtitle {
-    font-size: 1rem;
-    color: #666;
+.page-hero-subtitle {
+    font-size: var(--text-lg);
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 1;
+    margin: 0;
+    font-weight: var(--font-medium);
+    line-height: var(--leading-relaxed);
 }
 
-/* Form */
+/* ========================================
+   FORM
+   ======================================== */
+
 .create-meetup-form {
-    background-color: white;
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    padding: 2.5rem;
+    background-color: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-3xl) var(--radius-3xl);
+    padding: var(--spacing-10) var(--spacing-8) var(--spacing-8);
+    box-shadow: var(--shadow-xl);
+    animation: scaleIn 0.5s var(--ease-out) 0.2s backwards;
 }
 
 .form-section {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--spacing-6);
 }
 
-.field-note {
-    font-size: 0.875rem;
-    color: #999;
-    margin-top: -0.5rem;
-    margin-bottom: 0;
+.form-section:last-of-type {
+    margin-bottom: var(--spacing-8);
 }
 
-/* Info section */
-.info-section {
-    background-color: #f9f9f9;
-    border: 1px dashed #d1d1d1;
-    border-radius: 6px;
-    padding: 1rem;
-    margin-bottom: 2rem;
-}
+/* ========================================
+   FORM ACTIONS
+   ======================================== */
 
-.info-text {
-    font-size: 0.95rem;
-    color: #666;
-    margin: 0;
-}
-
-/* Form actions */
 .form-actions {
     display: flex;
-    gap: 1rem;
-    margin-top: 2rem;
+    flex-direction: column;
+    gap: var(--spacing-3);
+    margin-top: var(--spacing-8);
+    padding-top: var(--spacing-8);
+    border-top: 1px solid var(--color-border-light);
 }
 
 .form-actions button {
-    flex: 1;
+    width: 100%;
 }
 
-/* Responsive */
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
 @media (max-width: 768px) {
-    .page-title {
-        font-size: 2rem;
+    .create-meetup-main {
+        padding: var(--spacing-6) var(--spacing-4);
+    }
+
+    .page-hero {
+        padding: var(--spacing-10) var(--spacing-6);
+        border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    }
+
+    .page-hero-title {
+        font-size: var(--text-3xl);
+    }
+
+    .page-hero-subtitle {
+        font-size: var(--text-base);
     }
 
     .create-meetup-form {
-        padding: 1.5rem;
+        padding: var(--spacing-8) var(--spacing-6) var(--spacing-6);
+        border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
     }
 
-    .form-actions {
-        flex-direction: column-reverse;
+    .form-section {
+        margin-bottom: var(--spacing-5);
     }
 }
