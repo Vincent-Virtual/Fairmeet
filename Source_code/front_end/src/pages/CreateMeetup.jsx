@@ -49,7 +49,23 @@ function CreateMeetup() {
         }));
     };
 
-    const handleSubmit = (e) => {
+    // const handleSubmit = (e) => {
+    //     e.preventDefault();
+
+    //     const eventCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    //     const meetupData = {
+    //         ...formData,
+    //         eventCode,
+    //         createdAt: new Date().toISOString(),
+    //         participants: []
+    //     };
+
+    //     localStorage.setItem(`meetup_${eventCode}`, JSON.stringify(meetupData));
+
+    //     navigate(`/event-created/${eventCode}`);
+    // };
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         const eventCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -61,10 +77,31 @@ function CreateMeetup() {
             participants: []
         };
 
-        localStorage.setItem(`meetup_${eventCode}`, JSON.stringify(meetupData));
+        try {
+            const response = await fetch('/api/create-meetup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(meetupData)
+            });
 
-        navigate(`/event-created/${eventCode}`);
+            if (!response.ok) {
+                throw new Error('Failed to create meetup');
+            }
+
+            const result = await response.json();
+
+            // optional: keep localStorage too, if teammate flow still uses it
+            localStorage.setItem(`meetup_${eventCode}`, JSON.stringify(meetupData));
+
+            navigate(`/event-created/${result.eventCode}`);
+        } catch (error) {
+            console.error('Error sending meetup data:', error);
+            alert('Could not create meetup');
+        }
     };
+
 
     const handleCancel = () => {
         navigate('/');
