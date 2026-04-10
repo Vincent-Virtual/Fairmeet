@@ -13,6 +13,10 @@ import ParticipantCard from '../components/ParticipantCard';
 import Button from '../components/ui/Button';
 import './Results.css';
 
+import { useLocation } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
 function Results() {
     const { eventCode } = useParams();
     const navigate = useNavigate();
@@ -57,12 +61,34 @@ function Results() {
         }
     ];
 
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    // useEffect(() => {
+    //     const data = localStorage.getItem(`meetup_${eventCode}`);
+    //     if (data) {
+    //         setMeetupData(JSON.parse(data));
+    //     }
+    // }, [eventCode]);
     useEffect(() => {
-        const data = localStorage.getItem(`meetup_${eventCode}`);
-        if (data) {
-            setMeetupData(JSON.parse(data));
-        }
+        const fetchMeetup = async () => {
+            try {
+                const response = await fetch(`/api/meetup/${eventCode}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Failed to fetch meetup");
+                }
+
+                setMeetupData(data);
+            } catch (err) {
+                console.error("Failed to load meetup:", err);
+            }
+        };
+
+        fetchMeetup();
     }, [eventCode]);
+
+    const mapLocation = meetupData?.mapLocation;
 
     const handleRecalculate = () => {
         alert('Recalculate feature - will trigger backend recalculation');
@@ -105,15 +131,33 @@ function Results() {
                                 <span className="map-title">Map View</span>
                             </div>
 
-                            {/* Map placeholder */}
-                            <div className="map-placeholder">
-                                <div className="map-placeholder-content">
-                                    <MapIcon className="map-placeholder-icon" />
-                                    <p className="map-placeholder-text">Map Placeholder</p>
-                                    <p className="map-placeholder-subtext">
-                                        Shows participant locations & venues
-                                    </p>
-                                </div>
+                            <div className="map-placeholder" style={{ height: "320px" }}>
+                                {mapLocation && mapLocation.lat && mapLocation.lon ? (
+                                    <MapContainer
+                                        center={[mapLocation.lat, mapLocation.lon]}
+                                        zoom={14}
+                                        scrollWheelZoom={false}
+                                        style={{ height: "100%", width: "100%" }}
+                                    >
+                                        <TileLayer
+                                            attribution="&copy; OpenStreetMap contributors"
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+
+                                        <Marker position={[mapLocation.lat, mapLocation.lon]}>
+                                            <Popup>
+                                                {mapLocation.name || "Preferred Area"}
+                                            </Popup>
+                                        </Marker>
+                                    </MapContainer>
+                                ) : (
+                                    <div className="map-placeholder-content">
+                                        <MapIcon className="map-placeholder-icon" />
+                                        <p className="map-placeholder-text">
+                                            No location selected
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Legend */}

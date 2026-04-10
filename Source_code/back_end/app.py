@@ -1,5 +1,4 @@
-import os
-
+import requests
 import os
 from flask import Flask, request, jsonify, send_from_directory
 
@@ -18,6 +17,8 @@ app = Flask(
     static_url_path=""
 )
 
+meetups = {}
+
 # --------------------------------------------------
 # API routes
 # --------------------------------------------------
@@ -32,14 +33,12 @@ def create_meetup():
     meetup_name = data.get("meetupName")
     activity_type = data.get("activityType")
     budget = data.get("budget")
-    preferred_area = data.get("preferredArea")
+    preferred_area = (data.get("preferredArea") or "").strip()
     indoor_outdoor = data.get("indoorOutdoor")
     event_code = data.get("eventCode")
     created_at = data.get("createdAt")
     participants = data.get("participants", [])
 
-    # For now, just print what came in.
-    # Later you can save to a database here.
     print("Received meetup:")
     print({
         "meetupName": meetup_name,
@@ -52,10 +51,86 @@ def create_meetup():
         "participants": participants
     })
 
-    return jsonify({
+    lat = None
+    lon = None
+    location_name = None
+
+    if preferred_area:
+        query = f"{preferred_area}, Boston, Massachusetts"
+
+        try:
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "limit": 1
+                },
+                headers={
+                    "User-Agent": "FairmeetPrototype/1.0"
+                },
+                timeout=10
+            )
+
+            results = response.json()
+
+            if results:
+                place = results[0]
+                lat = float(place["lat"])
+                lon = float(place["lon"])
+                location_name = place.get("display_name")
+
+                print(lat, lon)
+
+        except Exception as e:
+            print("Geocoding failed:", str(e))
+
+    # return jsonify({
+    #     "message": "Meetup created successfully",
+    #     "eventCode": event_code,
+    #     "meetupName": meetup_name,
+    #     "activityType": activity_type,
+    #     "budget": budget,
+    #     "preferredArea": preferred_area,
+    #     "indoorOutdoor": indoor_outdoor,
+    #     "createdAt": created_at,
+    #     "participants": participants,
+    #     "mapLocation": {
+    #         "name": location_name,
+    #         "lat": lat,
+    #         "lon": lon
+    #     }
+    # }), 200
+    meetups[event_code] = {
         "message": "Meetup created successfully",
-        "eventCode": event_code
-    }), 200
+        "eventCode": event_code,
+        "meetupName": meetup_name,
+        "activityType": activity_type,
+        "budget": budget,
+        "preferredArea": preferred_area,
+        "indoorOutdoor": indoor_outdoor,
+        "createdAt": created_at,
+        "participants": participants,
+        "mapLocation": {
+            "name": location_name,
+            "lat": lat,
+            "lon": lon
+        }
+    }
+
+    return jsonify(meetups[event_code]), 200
+
+
+@app.route("/api/meetup/<event_code>", methods=["GET"])
+def get_meetup(event_code):
+    meetup = meetups.get(event_code)
+
+    if not meetup:
+        return jsonify({"error": "Meetup not found"}), 404
+
+    return jsonify(meetup), 200
+
+
 
 # Example test route
 @app.route("/api/health", methods=["GET"])
