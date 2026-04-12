@@ -46,23 +46,48 @@ function JoinMeetup() {
         }
     }, [formData.eventCode]);
 
-    // Load meetup data from localStorage
-    const loadMeetupData = (code) => {
-        const data = localStorage.getItem(`meetup_${code.toUpperCase()}`);
-        if (data) {
-            const meetup = JSON.parse(data);
+    // // Load meetup data from localStorage
+    // const loadMeetupData = (code) => {
+    //     const data = localStorage.getItem(`meetup_${code.toUpperCase()}`);
+    //     if (data) {
+    //         const meetup = JSON.parse(data);
+    //         setMeetupData(meetup);
+    //         setError('');
+
+    //         // Check if preferences are locked by organizer
+    //         if (meetup.budget || meetup.indoorOutdoor !== 'Any') {
+    //             setPreferencesLocked(true);
+    //         }
+    //     } else {
+    //         setMeetupData(null);
+    //         setError('Event code not found');
+    //     }
+    // };
+    const loadMeetupData = async (code) => {
+        try {
+            const response = await fetch(`/api/meetup/${code.toUpperCase()}`);
+            const meetup = await response.json();
+
+            if (!response.ok) {
+                throw new Error(meetup.error || 'Event code not found');
+            }
+
             setMeetupData(meetup);
             setError('');
 
-            // Check if preferences are locked by organizer
             if (meetup.budget || meetup.indoorOutdoor !== 'Any') {
                 setPreferencesLocked(true);
+            } else {
+                setPreferencesLocked(false);
             }
-        } else {
+        } catch (err) {
             setMeetupData(null);
-            setError('Event code not found');
+            setError(err.message || 'Event code not found');
+            setPreferencesLocked(false);
         }
     };
+
+
 
     // Handle input changes
     const handleInputChange = (e) => {
@@ -86,49 +111,90 @@ function JoinMeetup() {
         }));
     };
 
-    // Handle form submission
-    const handleSubmit = (e) => {
+    // // Handle form submission
+    // const handleSubmit = (e) => {
+    //     e.preventDefault();
+
+    //     // Validate event code
+    //     if (!meetupData) {
+    //         setError('Please enter a valid event code');
+    //         return;
+    //     }
+
+    //     // Validate location
+    //     if (!formData.location.trim()) {
+    //         setError('Please enter your location');
+    //         return;
+    //     }
+
+    //     // Create participant data
+    //     const participant = {
+    //         id: Math.random().toString(36).substring(2, 9),
+    //         name: formData.name || 'Anonymous',
+    //         location: formData.location,
+    //         budgetPreference: formData.budgetPreference,
+    //         indoorOutdoor: formData.indoorOutdoor,
+    //         joinedAt: new Date().toISOString()
+    //     };
+
+    //     // Add participant to meetup
+    //     const updatedMeetup = {
+    //         ...meetupData,
+    //         participants: [...(meetupData.participants || []), participant]
+    //     };
+
+    //     // Save updated meetup data
+    //     localStorage.setItem(`meetup_${formData.eventCode.toUpperCase()}`, JSON.stringify(updatedMeetup));
+
+    //     // Navigate to results page (or waiting page if not enough participants)
+    //     if (updatedMeetup.participants.length >= 2) {
+    //         navigate(`/results/${formData.eventCode.toUpperCase()}`);
+    //     } else {
+    //         // For now, go to results anyway (demo purposes)
+    //         navigate(`/results/${formData.eventCode.toUpperCase()}`);
+    //     }
+    // };
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Validate event code
         if (!meetupData) {
             setError('Please enter a valid event code');
             return;
         }
 
-        // Validate location
         if (!formData.location.trim()) {
             setError('Please enter your location');
             return;
         }
 
-        // Create participant data
-        const participant = {
-            id: Math.random().toString(36).substring(2, 9),
-            name: formData.name || 'Anonymous',
-            location: formData.location,
-            budgetPreference: formData.budgetPreference,
-            indoorOutdoor: formData.indoorOutdoor,
-            joinedAt: new Date().toISOString()
-        };
+        try {
+            const response = await fetch('/api/join-meetup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    eventCode: formData.eventCode.toUpperCase(),
+                    name: formData.name || 'Anonymous',
+                    location: formData.location,
+                    budgetPreference: formData.budgetPreference,
+                    indoorOutdoor: formData.indoorOutdoor
+                })
+            });
 
-        // Add participant to meetup
-        const updatedMeetup = {
-            ...meetupData,
-            participants: [...(meetupData.participants || []), participant]
-        };
+            const updatedMeetup = await response.json();
 
-        // Save updated meetup data
-        localStorage.setItem(`meetup_${formData.eventCode.toUpperCase()}`, JSON.stringify(updatedMeetup));
+            if (!response.ok) {
+                throw new Error(updatedMeetup.error || 'Failed to join meetup');
+            }
 
-        // Navigate to results page (or waiting page if not enough participants)
-        if (updatedMeetup.participants.length >= 2) {
             navigate(`/results/${formData.eventCode.toUpperCase()}`);
-        } else {
-            // For now, go to results anyway (demo purposes)
-            navigate(`/results/${formData.eventCode.toUpperCase()}`);
+        } catch (err) {
+            setError(err.message || 'Failed to join meetup');
         }
     };
+
+
 
     // Handle cancel
     const handleCancel = () => {

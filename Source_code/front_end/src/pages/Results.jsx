@@ -69,6 +69,24 @@ function Results() {
     //         setMeetupData(JSON.parse(data));
     //     }
     // }, [eventCode]);
+    // useEffect(() => {
+    //     const fetchMeetup = async () => {
+    //         try {
+    //             const response = await fetch(`/api/meetup/${eventCode}`);
+    //             const data = await response.json();
+
+    //             if (!response.ok) {
+    //                 throw new Error(data.error || "Failed to fetch meetup");
+    //             }
+
+    //             setMeetupData(data);
+    //         } catch (err) {
+    //             console.error("Failed to load meetup:", err);
+    //         }
+    //     };
+
+    //     fetchMeetup();
+    // }, [eventCode]);
     useEffect(() => {
         const fetchMeetup = async () => {
             try {
@@ -80,15 +98,27 @@ function Results() {
                 }
 
                 setMeetupData(data);
+                setError('');
             } catch (err) {
                 console.error("Failed to load meetup:", err);
+                setError(err.message || "Failed to load meetup");
+            } finally {
+                setLoading(false);
             }
         };
 
         fetchMeetup();
+
+        const interval = setInterval(fetchMeetup, 3000);
+
+        return () => clearInterval(interval);
     }, [eventCode]);
 
-    const mapLocation = meetupData?.mapLocation;
+    
+
+    // const mapLocation = meetupData?.mapLocation;
+    const mapLocation = meetupData?.bestPlace || meetupData?.mapLocation;
+    const participants = meetupData?.participants || [];
 
     const handleRecalculate = () => {
         alert('Recalculate feature - will trigger backend recalculation');
@@ -134,8 +164,9 @@ function Results() {
                             <div className="map-placeholder" style={{ height: "320px" }}>
                                 {mapLocation && mapLocation.lat && mapLocation.lon ? (
                                     <MapContainer
+                                        key={`${mapLocation.lat}-${mapLocation.lon}`}
                                         center={[mapLocation.lat, mapLocation.lon]}
-                                        zoom={14}
+                                        zoom={13}
                                         scrollWheelZoom={false}
                                         style={{ height: "100%", width: "100%" }}
                                     >
@@ -144,18 +175,38 @@ function Results() {
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         />
 
+                                        {/* Best place marker */}
                                         <Marker position={[mapLocation.lat, mapLocation.lon]}>
                                             <Popup>
-                                                {mapLocation.name || "Preferred Area"}
+                                                {mapLocation.name || "Suggested Meetup Place"}
                                             </Popup>
                                         </Marker>
+
+                                        {/* Participant markers */}
+                                        {participants.map((participant, index) => (
+                                            participant.lat != null && participant.lon != null ? (
+                                                <Marker
+                                                    key={participant.id || `${participant.name}-${index}`}
+                                                    position={[participant.lat, participant.lon]}
+                                                >
+                                                    <Popup>
+                                                        <strong>{participant.name || 'Participant'}</strong>
+                                                        <br />
+                                                        {participant.location || participant.locationName || 'Unknown location'}
+                                                    </Popup>
+                                                </Marker>
+                                            ) : null
+                                        ))}
                                     </MapContainer>
                                 ) : (
                                     <div className="map-placeholder-content">
                                         <MapIcon className="map-placeholder-icon" />
                                         <p className="map-placeholder-text">
-                                            No location selected
+                                            {loading ? "Loading map..." : "No location selected"}
                                         </p>
+                                        {error && (
+                                            <p className="map-placeholder-subtext">{error}</p>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -243,7 +294,8 @@ function Results() {
                         <div className="participants-grid">
                             {meetupData?.participants?.map((participant) => (
                                 <ParticipantCard
-                                    key={participant.id}
+                                    // key={participant.id}
+                                    key={participant.id || `${participant.name}-${participant.location || ''}`}
                                     name={participant.name}
                                     location={participant.location}
                                 />
