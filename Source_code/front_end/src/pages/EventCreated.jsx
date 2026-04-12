@@ -13,11 +13,27 @@ function EventCreated() {
     const [copied, setCopied] = useState(false);
     const [meetupData, setMeetupData] = useState(null);
 
+    // useEffect(() => {
+    //     const data = localStorage.getItem(`meetup_${eventCode}`);
+    //     if (data) {
+    //         setMeetupData(JSON.parse(data));
+    //     }
+    // }, [eventCode]);
     useEffect(() => {
-        const data = localStorage.getItem(`meetup_${eventCode}`);
-        if (data) {
-            setMeetupData(JSON.parse(data));
-        }
+        const fetchMeetup = async () => {
+            try {
+                const response = await fetch(`/api/meetup/${eventCode}`);
+                const data = await response.json();
+
+                if (!response.ok) return;
+
+                setMeetupData(data);
+            } catch (err) {
+                console.error("Failed to load meetup:", err);
+            }
+        };
+
+        fetchMeetup();
     }, [eventCode]);
 
     const handleCopyCode = () => {
