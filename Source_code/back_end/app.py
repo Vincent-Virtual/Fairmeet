@@ -25,7 +25,7 @@ def geocode_location(text):
     if not text:
         return None, None, None
 
-    query = f"{text}, Boston, Massachusetts"
+    query = f"{text}, Massachusetts"
 
     try:
         response = requests.get(
@@ -75,6 +75,7 @@ def compute_best_place(meetup):
     avg_lat = sum(p[0] for p in points) / len(points)
     avg_lon = sum(p[1] for p in points) / len(points)
 
+    print("new best place", (avg_lat, avg_lon))
     return {
         "name": "Suggested Meetup Center",
         "lat": avg_lat,
@@ -274,7 +275,6 @@ def join_meetup():
 
     # keep mapLocation synced with current recommendation
     meetup["mapLocation"] = meetup["bestPlace"]
-
     return jsonify(meetup), 200
 
 
@@ -298,29 +298,18 @@ def health():
 # --------------------------------------------------
 # Frontend routes
 # --------------------------------------------------
-# @app.route("/", defaults={"path": ""})
-# @app.route("/<path:path>")
-# def serve_react(path):
-#     requested_path = os.path.join(DIST_DIR, path)
-
-#     # If the requested file exists, serve it directly
-#     if path and os.path.exists(requested_path):
-#         return send_from_directory(DIST_DIR, path)
-
-#     # Otherwise serve React's index.html
-#     return send_from_directory(DIST_DIR, "index.html")
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_react(path):
-    print("serve_react hit with path:", path)
+    # print("serve_react hit with path:", path)
 
     requested_path = os.path.join(DIST_DIR, path)
 
     if path and os.path.exists(requested_path):
         return send_from_directory(DIST_DIR, path)
 
-    print("Falling back to index.html")
+    # print("Falling back to index.html")
     return send_from_directory(DIST_DIR, "index.html")
 
 # --------------------------------------------------

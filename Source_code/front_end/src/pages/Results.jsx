@@ -17,6 +17,15 @@ import { useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
+import L from 'leaflet';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+L.Marker.prototype.options.icon = L.icon({
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+});
+
 function Results() {
     const { eventCode } = useParams();
     const navigate = useNavigate();
