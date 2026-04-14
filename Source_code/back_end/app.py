@@ -1,6 +1,7 @@
 import requests
 import os
 from flask import Flask, request, jsonify, send_from_directory
+import math
 
 # --------------------------------------------------
 # Paths
@@ -11,15 +12,72 @@ DIST_DIR = os.path.abspath(os.path.join(BASE_DIR, "../front_end/dist"))
 # --------------------------------------------------
 # Flask app
 # --------------------------------------------------
-# app = Flask(
-#     __name__,
-#     static_folder=DIST_DIR,
-#     static_url_path=""
-# )
 app = Flask(__name__)
 
 
 meetups = {}
+
+
+
+def haversine_miles(lat1, lon1, lat2, lon2):
+    if None in (lat1, lon1, lat2, lon2):
+        return None
+
+    R = 3958.8  # Earth radius in miles
+
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c
+
+def build_meetup_summary(meetup):
+    best_place = meetup.get("bestPlace") or meetup.get("mapLocation") or {}
+    participants = meetup.get("participants", [])
+
+    distances = []
+    for p in participants:
+        d = haversine_miles(
+            p.get("lat"),
+            p.get("lon"),
+            best_place.get("lat"),
+            best_place.get("lon")
+        )
+        if d is not None:
+            distances.append(d)
+
+    avg_distance = round(sum(distances) / len(distances), 1) if distances else 0.0
+    max_distance = round(max(distances), 1) if distances else 0.0
+
+    raw_score = 100 - 5 * avg_distance - 2 * max_distance
+    fairness_score = max(0, min(100, round(raw_score)))
+
+    matched_preferences = []
+    if meetup.get("activityType"):
+        matched_preferences.append(meetup["activityType"].capitalize())
+    if meetup.get("indoorOutdoor"):
+        matched_preferences.append(meetup["indoorOutdoor"])
+    if meetup.get("budget"):
+        matched_preferences.append(meetup["budget"])
+
+    explanation = (
+        f"This suggested place balances travel for the current group. "
+        f"The average distance is {avg_distance} miles and the furthest participant "
+        f"travels {max_distance} miles. It aligns with the selected preferences."
+    )
+
+    return {
+        "fairnessScore": fairness_score,
+        "avgDistance": avg_distance,
+        "maxDistance": max_distance,
+        "matchedPreferences": matched_preferences,
+        "explanation": explanation
+    }
+
 
 def geocode_location(text):
     if not text:
@@ -239,6 +297,8 @@ def create_meetup():
         }
     }
 
+    meetups[event_code]["summary"] = build_meetup_summary(meetups[event_code])
+
     return jsonify(meetups[event_code]), 200
 
 
@@ -275,6 +335,8 @@ def join_meetup():
 
     # keep mapLocation synced with current recommendation
     meetup["mapLocation"] = meetup["bestPlace"]
+    meetup["summary"] = build_meetup_summary(meetup)
+
     return jsonify(meetup), 200
 
 

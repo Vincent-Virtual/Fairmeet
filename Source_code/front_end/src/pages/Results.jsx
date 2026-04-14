@@ -128,6 +128,10 @@ function Results() {
     // const mapLocation = meetupData?.mapLocation;
     const mapLocation = meetupData?.bestPlace || meetupData?.mapLocation;
     const participants = meetupData?.participants || [];
+    const summary = meetupData?.summary;
+
+    const venueName = mapLocation?.name || 'Suggested Meetup Center';
+    const venueAddress = meetupData?.preferredArea || 'Near the current group center';
 
     const handleRecalculate = () => {
         alert('Recalculate feature - will trigger backend recalculation');
@@ -238,10 +242,28 @@ function Results() {
 
                         {/* Right column - Venues list */}
                         <div className="venues-section">
-                            {venuesToDisplay.map((venue) => (
+                            {summary ? (
+                                <VenueCard
+                                    rank={1}
+                                    name={venueName}
+                                    address={venueAddress}
+                                    fairnessScore={summary.fairnessScore}
+                                    avgDistance={summary.avgDistance}
+                                    maxDistance={summary.maxDistance}
+                                    matchedPreferences={summary.matchedPreferences}
+                                    explanation={summary.explanation}
+                                />
+                            ) : (
+                                <div className="no-participants">
+                                    <p>No computed venue summary yet.</p>
+                                </div>
+                            )}
+
+                            {/* Mock venues after the real first one */}
+                            {(showAllVenues ? mockVenues.slice(0) : mockVenues.slice(0, 2)).map((venue, index) => (
                                 <VenueCard
                                     key={venue.rank}
-                                    rank={venue.rank}
+                                    rank={index + 2}
                                     name={venue.name}
                                     address={venue.address}
                                     fairnessScore={venue.fairnessScore}
@@ -253,14 +275,14 @@ function Results() {
                             ))}
 
                             {/* Show more/less button */}
-                            {mockVenues.length > 3 && (
+                            {mockVenues.length > 2 && (
                                 <div className="show-more-section">
                                     <button
                                         className="show-more-btn"
                                         onClick={() => setShowAllVenues(!showAllVenues)}
                                     >
                                         {showAllVenues
-                                            ? `Showing top ${mockVenues.length} results • Show less`
+                                            ? `Showing ${mockVenues.length + 1} results • Show less`
                                             : `Showing top 3 results • More venues available in full version`
                                         }
                                     </button>
