@@ -1,0 +1,134 @@
+/* src/components/ui/Select.css */
+
+/**
+ * Select Component Styles
+ * Custom dropdown with gradient accent
+ */
+
+/* ========================================
+   SELECT GROUP CONTAINER
+   ======================================== */
+
+.select-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    width: 100%;
+}
+
+/* ========================================
+   LABEL
+   ======================================== */
+
+.select-label {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    color: var(--color-text-primary);
+    line-height: var(--leading-tight);
+}
+
+/* ========================================
+   SELECT FIELD
+   ======================================== */
+
+.select-field {
+    /* Layout */
+    width: 100%;
+    height: var(--input-height);
+    padding: var(--input-padding-y) var(--spacing-10) var(--input-padding-y) var(--input-padding-x);
+
+    /* Typography */
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--color-text-primary);
+
+    /* Appearance */
+    background-color: var(--color-white);
+    border: var(--input-border-width) solid var(--color-border);
+    border-radius: var(--input-border-radius);
+    cursor: pointer;
+
+    /* Custom dropdown arrow */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-3) center;
+    background-size: 20px;
+
+    /* Transitions */
+    transition: all var(--transition-base);
+}
+
+/* Hover State */
+.select-field:hover:not(:disabled):not(:focus) {
+    border-color: var(--color-gray-300);
+}
+
+/* Focus State */
+.select-field:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: var(--input-focus-ring);
+}
+
+/* Disabled State */
+.select-field:disabled {
+    background-color: var(--color-gray-100);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Placeholder option */
+.select-field option[value=""] {
+    color: var(--color-text-tertiary);
+}
+
+/* ========================================
+   SELECT WITH GRADIENT FOCUS
+   ======================================== */
+
+.select-field:focus {
+    /* Add subtle gradient glow on focus */
+    background-color: var(--color-white);
+    box-shadow:
+            var(--input-focus-ring),
+            0 4px 12px rgba(139, 92, 246, 0.05);
+}
+
+/* ========================================
+   HELPER TEXT
+   ======================================== */
+
+.select-helper-text {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    line-height: var(--leading-normal);
+    margin: 0;
+}
+
+/* ========================================
+   ERROR STATE
+   ======================================== */
+
+.select-field.error {
+    border-color: var(--color-error);
+}
+
+.select-field.error:focus {
+    border-color: var(--color-error);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .select-field {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}

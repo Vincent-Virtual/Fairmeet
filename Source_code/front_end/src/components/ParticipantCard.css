@@ -1,0 +1,100 @@
+/* src/components/ParticipantCard.css */
+
+/**
+ * ParticipantCard Component Styles
+ * Participant info with SOLID BLUE avatar
+ */
+
+/* ========================================
+   PARTICIPANT CARD
+   ======================================== */
+
+.participant-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+    padding: var(--spacing-5);
+    background-color: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    transition: all var(--transition-base);
+}
+
+.participant-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: rgba(91, 141, 239, 0.3);
+    transform: translateY(-2px);
+}
+
+/* ========================================
+   AVATAR - SOLID BLUE
+   ======================================== */
+
+.participant-avatar {
+    width: 56px;
+    height: 56px;
+    background: var(--color-primary-500);  /* ✅ SOLID BLUE */
+    color: var(--color-white);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    flex-shrink: 0;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-base);
+}
+
+.participant-card:hover .participant-avatar {
+    transform: scale(1.1);
+    background: var(--color-primary-600);  /* Darker on hover */
+    box-shadow: var(--shadow-primary);
+}
+
+/* ========================================
+   INFO
+   ======================================== */
+
+.participant-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.participant-name {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    color: var(--color-text-primary);
+    margin: 0 0 var(--spacing-1) 0;
+    line-height: var(--leading-tight);
+}
+
+.participant-location {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: var(--leading-normal);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .participant-card {
+        padding: var(--spacing-4);
+    }
+
+    .participant-avatar {
+        width: 48px;
+        height: 48px;
+        font-size: var(--text-lg);
+    }
+
+    .participant-name {
+        font-size: var(--text-base);
+    }
+}

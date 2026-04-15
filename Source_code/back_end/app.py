@@ -1,98 +1,381 @@
-from flask import Flask, jsonify, send_from_directory
-from pathlib import Path
-from math import radians, sin, cos, sqrt, atan2
+import requests
+import os
+from flask import Flask, request, jsonify, send_from_directory
+import math
 
-BASE_DIR = Path(__file__).resolve().parent          # .../Source_code/backend
-FRONTEND_DIR = (BASE_DIR / ".." / "front_end").resolve()
+# --------------------------------------------------
+# Paths
+# --------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DIST_DIR = os.path.abspath(os.path.join(BASE_DIR, "../front_end/dist"))
 
+# --------------------------------------------------
+# Flask app
+# --------------------------------------------------
 app = Flask(__name__)
 
-@app.get("/")
-def home():
-    # serves Source_code/front_end/index.html
-    return send_from_directory(FRONTEND_DIR, "index.html")
 
-# Optional: serve other frontend files if you add them later (css/js/images)
-@app.get("/<path:filename>")
-def frontend_files(filename):
-    return send_from_directory(FRONTEND_DIR, filename)
+meetups = {}
 
 
-# ---------------- Demo backend logic ----------------
 
-VENUES = [
-    {"id": "c1", "name": "Cafe Nebula", "tag": "coffee", "lat": 42.3512, "lng": -71.1156},
-    {"id": "c2", "name": "Espresso Harbor", "tag": "coffee", "lat": 42.3635, "lng": -71.1030},
-    {"id": "m1", "name": "Cinema Aurora", "tag": "movies", "lat": 42.3539, "lng": -71.0640},
-    {"id": "s1", "name": "Powder Peak (mock)", "tag": "skiing", "lat": 42.5280, "lng": -71.7900},
-]
+def haversine_miles(lat1, lon1, lat2, lon2):
+    if None in (lat1, lon1, lat2, lon2):
+        return None
 
-DEMO_PEOPLE = [
-    {"name": "Vincent", "lat": 42.361, "lng": -71.105, "prefs": {"coffee": 1.0, "movies": 0.2, "skiing": 0.1}},
-    {"name": "Alice",   "lat": 42.345, "lng": -71.085, "prefs": {"coffee": 0.7, "movies": 0.9, "skiing": 0.0}},
-    {"name": "Bob",     "lat": 42.372, "lng": -71.120, "prefs": {"coffee": 0.8, "movies": 0.1, "skiing": 0.2}},
-]
-ACTIVITY_TAGS = ["coffee", "movies", "skiing"]
+    R = 3958.8  # Earth radius in miles
+
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c
+
+def build_meetup_summary(meetup):
+    best_place = meetup.get("bestPlace") or meetup.get("mapLocation") or {}
+    participants = meetup.get("participants", [])
+
+    distances = []
+    for p in participants:
+        d = haversine_miles(
+            p.get("lat"),
+            p.get("lon"),
+            best_place.get("lat"),
+            best_place.get("lon")
+        )
+        if d is not None:
+            distances.append(d)
+
+    avg_distance = round(sum(distances) / len(distances), 1) if distances else 0.0
+    max_distance = round(max(distances), 1) if distances else 0.0
+
+    raw_score = 100 - 5 * avg_distance - 2 * max_distance
+    fairness_score = max(0, min(100, round(raw_score)))
+
+    matched_preferences = []
+    if meetup.get("activityType"):
+        matched_preferences.append(meetup["activityType"].capitalize())
+    if meetup.get("indoorOutdoor"):
+        matched_preferences.append(meetup["indoorOutdoor"])
+    if meetup.get("budget"):
+        matched_preferences.append(meetup["budget"])
+
+    explanation = (
+        f"This suggested place balances travel for the current group. "
+        f"The average distance is {avg_distance} miles and the furthest participant "
+        f"travels {max_distance} miles. It aligns with the selected preferences."
+    )
+
+    return {
+        "fairnessScore": fairness_score,
+        "avgDistance": avg_distance,
+        "maxDistance": max_distance,
+        "matchedPreferences": matched_preferences,
+        "explanation": explanation
+    }
 
 
-def haversine_m(lat1, lng1, lat2, lng2) -> float:
-    R = 6371000.0
-    phi1, phi2 = radians(lat1), radians(lat2)
-    dphi = radians(lat2 - lat1)
-    dlambda = radians(lng2 - lng1)
-    a = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlambda / 2) ** 2
-    return 2 * R * atan2(sqrt(a), sqrt(1 - a))
+def geocode_location(text):
+    if not text:
+        return None, None, None
+
+    query = f"{text}, Massachusetts"
+
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": query,
+                "format": "jsonv2",
+                "limit": 1
+            },
+            headers={
+                "User-Agent": "FairmeetPrototype/1.0"
+            },
+            timeout=10
+        )
+
+        results = response.json()
+
+        if results:
+            place = results[0]
+            return (
+                float(place["lat"]),
+                float(place["lon"]),
+                place.get("display_name")
+            )
+
+    except Exception as e:
+        print("Geocode error:", e)
+
+    return None, None, None
+
+def compute_best_place(meetup):
+    points = []
+
+    # preferred area pulls center slightly
+    if meetup.get("preferredAreaLat"):
+        points.append((
+            meetup["preferredAreaLat"],
+            meetup["preferredAreaLon"]
+        ))
+
+    for p in meetup["participants"]:
+        points.append((p["lat"], p["lon"]))
+
+    if not points:
+        return None
+
+    avg_lat = sum(p[0] for p in points) / len(points)
+    avg_lon = sum(p[1] for p in points) / len(points)
+
+    print("new best place", (avg_lat, avg_lon))
+    return {
+        "name": "Suggested Meetup Center",
+        "lat": avg_lat,
+        "lon": avg_lon
+    }
 
 
-def centroid(points):
-    n = len(points)
-    return {"lat": sum(p["lat"] for p in points) / n,
-            "lng": sum(p["lng"] for p in points) / n}
+# --------------------------------------------------
+# API routes
+# --------------------------------------------------
 
+# @app.route("/api/create-meetup", methods=["POST"])
+# def create_meetup():
+#     print("creating meetup...")
+#     data = request.get_json()
 
-def choose_activity(people, tags):
-    # maximize min preference, tie-break by avg
-    scores = {}
-    for t in tags:
-        vals = [float(p.get("prefs", {}).get(t, 0.0)) for p in people]
-        scores[t] = {"min": min(vals), "avg": sum(vals) / len(vals)}
-    best = max(tags, key=lambda t: (scores[t]["min"], scores[t]["avg"]))
-    return best, scores
+#     if not data:
+#         return jsonify({"error": "No JSON data received"}), 400
 
+#     meetup_name = data.get("meetupName")
+#     activity_type = data.get("activityType")
+#     budget = data.get("budget")
+#     preferred_area = (data.get("preferredArea") or "").strip()
+#     indoor_outdoor = data.get("indoorOutdoor")
+#     event_code = data.get("eventCode")
+#     created_at = data.get("createdAt")
+#     participants = data.get("participants", [])
 
-def best_venue(people, venues, alpha=0.7):
-    best = None
-    for v in venues:
-        ds = [haversine_m(p["lat"], p["lng"], v["lat"], v["lng"]) for p in people]
-        mx, mean = max(ds), sum(ds) / len(ds)
-        cost = alpha * mx + (1 - alpha) * mean
-        cand = (cost, mx, mean, v)
-        if best is None or cand[0] < best[0]:
-            best = cand
-    cost, mx, mean, v = best
-    return v, mx, mean
+#     print("Received meetup:")
+#     print({
+#         "meetupName": meetup_name,
+#         "activityType": activity_type,
+#         "budget": budget,
+#         "preferredArea": preferred_area,
+#         "indoorOutdoor": indoor_outdoor,
+#         "eventCode": event_code,
+#         "createdAt": created_at,
+#         "participants": participants
+#     })
 
+#     lat = None
+#     lon = None
+#     location_name = None
 
-@app.get("/api/demo")
-def api_demo():
-    meet = centroid(DEMO_PEOPLE)
-    activity, activity_scores = choose_activity(DEMO_PEOPLE, ACTIVITY_TAGS)
-    candidates = [v for v in VENUES if v["tag"] == activity] or VENUES
-    v, mx, mean = best_venue(DEMO_PEOPLE, candidates)
+#     if preferred_area:
+#         query = f"{preferred_area}, Boston, Massachusetts"
 
-    return jsonify({
-        "people": [{"name": p["name"], "lat": p["lat"], "lng": p["lng"]} for p in DEMO_PEOPLE],
-        "meeting_point": meet,
-        "activity": activity,
-        "activity_scores": activity_scores,
-        "best_venue": {
-            "id": v["id"], "name": v["name"], "tag": v["tag"], "lat": v["lat"], "lng": v["lng"],
-            "max_distance_km": round(mx / 1000, 2),
-            "mean_distance_km": round(mean / 1000, 2),
-        }
+#         try:
+#             response = requests.get(
+#                 "https://nominatim.openstreetmap.org/search",
+#                 params={
+#                     "q": query,
+#                     "format": "jsonv2",
+#                     "limit": 1
+#                 },
+#                 headers={
+#                     "User-Agent": "FairmeetPrototype/1.0"
+#                 },
+#                 timeout=10
+#             )
+
+#             results = response.json()
+
+#             if results:
+#                 place = results[0]
+#                 lat = float(place["lat"])
+#                 lon = float(place["lon"])
+#                 location_name = place.get("display_name")
+
+#                 print(lat, lon)
+
+#         except Exception as e:
+#             print("Geocoding failed:", str(e))
+
+#     meetups[event_code] = {
+#         "message": "Meetup created successfully",
+#         "eventCode": event_code,
+#         "meetupName": meetup_name,
+#         "activityType": activity_type,
+#         "budget": budget,
+#         "preferredArea": preferred_area,
+#         "indoorOutdoor": indoor_outdoor,
+#         "createdAt": created_at,
+#         "participants": participants,
+#         "mapLocation": {
+#             "name": location_name,
+#             "lat": lat,
+#             "lon": lon
+#         }
+#     }
+
+#     return jsonify(meetups[event_code]), 200
+
+@app.route("/api/create-meetup", methods=["POST"])
+def create_meetup():
+    print("creating meetup...")
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No JSON data received"}), 400
+
+    meetup_name = data.get("meetupName")
+    activity_type = data.get("activityType")
+    budget = data.get("budget")
+    preferred_area = (data.get("preferredArea") or "").strip()
+    indoor_outdoor = data.get("indoorOutdoor")
+    event_code = data.get("eventCode")
+    created_at = data.get("createdAt")
+    participants = data.get("participants", [])
+
+    print("Received meetup:")
+    print({
+        "meetupName": meetup_name,
+        "activityType": activity_type,
+        "budget": budget,
+        "preferredArea": preferred_area,
+        "indoorOutdoor": indoor_outdoor,
+        "eventCode": event_code,
+        "createdAt": created_at,
+        "participants": participants
     })
 
+    lat = None
+    lon = None
+    location_name = None
 
+    if preferred_area:
+        lat, lon, location_name = geocode_location(preferred_area)
+        print("Preferred area geocoded to:", lat, lon)
+
+    meetups[event_code] = {
+        "message": "Meetup created successfully",
+        "eventCode": event_code,
+        "meetupName": meetup_name,
+        "activityType": activity_type,
+        "budget": budget,
+        "preferredArea": preferred_area,
+        "indoorOutdoor": indoor_outdoor,
+        "createdAt": created_at,
+
+        # keep existing field
+        "participants": participants,
+
+        # keep existing field for map display
+        "mapLocation": {
+            "name": location_name,
+            "lat": lat,
+            "lon": lon
+        },
+
+        # extra fields for future recomputation
+        "preferredAreaLat": lat,
+        "preferredAreaLon": lon,
+        "preferredAreaName": location_name,
+
+        # new current recommendation
+        "bestPlace": {
+            "name": location_name or "Preferred Area",
+            "lat": lat,
+            "lon": lon
+        }
+    }
+
+    meetups[event_code]["summary"] = build_meetup_summary(meetups[event_code])
+
+    return jsonify(meetups[event_code]), 200
+
+
+@app.route("/api/join-meetup", methods=["POST"])
+def join_meetup():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No JSON data received"}), 400
+
+    event_code = data.get("eventCode")
+    name = data.get("name")
+    location_text = (data.get("location") or "").strip()
+
+    meetup = meetups.get(event_code)
+
+    if not meetup:
+        return jsonify({"error": "Meetup not found"}), 404
+
+    lat, lon, location_name = geocode_location(location_text)
+
+    new_participant = {
+        "name": name,
+        "location": location_text,
+        "locationName": location_name,
+        "lat": lat,
+        "lon": lon
+    }
+    print(name, location_name)
+
+    meetup["participants"].append(new_participant)
+
+    meetup["bestPlace"] = compute_best_place(meetup)
+
+    # keep mapLocation synced with current recommendation
+    meetup["mapLocation"] = meetup["bestPlace"]
+    meetup["summary"] = build_meetup_summary(meetup)
+
+    return jsonify(meetup), 200
+
+
+@app.route("/api/meetup/<event_code>", methods=["GET"])
+def get_meetup(event_code):
+    meetup = meetups.get(event_code)
+
+    if not meetup:
+        return jsonify({"error": "Meetup not found"}), 404
+
+    return jsonify(meetup), 200
+
+
+
+# Example test route
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
+# --------------------------------------------------
+# Frontend routes
+# --------------------------------------------------
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    # print("serve_react hit with path:", path)
+
+    requested_path = os.path.join(DIST_DIR, path)
+
+    if path and os.path.exists(requested_path):
+        return send_from_directory(DIST_DIR, path)
+
+    # print("Falling back to index.html")
+    return send_from_directory(DIST_DIR, "index.html")
+
+# --------------------------------------------------
+# Run app
+# --------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
-
+    app.run(debug=True, host="127.0.0.1", port=5001)
