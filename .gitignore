@@ -1,2 +1,7 @@
 UI_Design_Version_1/node_modules/
 .vscode
+__pycache__/
+*.pyc
+.env
+Source_code/front_end/node_modules/
+Source_code/front_end/dist/

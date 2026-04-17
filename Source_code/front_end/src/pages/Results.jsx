@@ -13,7 +13,6 @@ import ParticipantCard from '../components/ParticipantCard';
 import Button from '../components/ui/Button';
 import './Results.css';
 
-import { useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -33,69 +32,8 @@ function Results() {
     const [meetupData, setMeetupData] = useState(null);
     const [showAllVenues, setShowAllVenues] = useState(false);
 
-    // Mock venue data
-    const mockVenues = [
-        {
-            rank: 1,
-            name: "Central Cafe & Bistro",
-            address: "456 Main Street, Downtown",
-            fairnessScore: 92,
-            avgDistance: 4.2,
-            maxDistance: 6.8,
-            matchedPreferences: ["Restaurant", "Indoor", "$$"],
-            explanation: "This location minimizes the maximum distance any participant needs to travel (6.8 miles), while keeping the average distance at 4.2 miles. It matches all specified activity preferences and budget constraints.",
-            coordinates: { lat: 40.7589, lng: -73.9851 }
-        },
-        {
-            rank: 2,
-            name: "Harmony Coffee House",
-            address: "789 Oak Avenue, Midtown",
-            fairnessScore: 88,
-            avgDistance: 4.5,
-            maxDistance: 7.2,
-            matchedPreferences: ["Cafe", "Indoor", "$"],
-            explanation: "This location minimizes the maximum distance any participant needs to travel (7.2 miles), while keeping the average distance at 4.5 miles. It matches all specified activity preferences and budget constraints.",
-            coordinates: { lat: 40.7549, lng: -73.9840 }
-        },
-        {
-            rank: 3,
-            name: "The Meeting Spot",
-            address: "321 Elm Street, Central District",
-            fairnessScore: 85,
-            avgDistance: 4.8,
-            maxDistance: 7.5,
-            matchedPreferences: ["Restaurant", "Indoor/Outdoor", "$$"],
-            explanation: "This location minimizes the maximum distance any participant needs to travel (7.5 miles), while keeping the average distance at 4.8 miles. It matches all specified activity preferences and budget constraints.",
-            coordinates: { lat: 40.7580, lng: -73.9855 }
-        }
-    ];
-
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    // useEffect(() => {
-    //     const data = localStorage.getItem(`meetup_${eventCode}`);
-    //     if (data) {
-    //         setMeetupData(JSON.parse(data));
-    //     }
-    // }, [eventCode]);
-    // useEffect(() => {
-    //     const fetchMeetup = async () => {
-    //         try {
-    //             const response = await fetch(`/api/meetup/${eventCode}`);
-    //             const data = await response.json();
-
-    //             if (!response.ok) {
-    //                 throw new Error(data.error || "Failed to fetch meetup");
-    //             }
-
-    //             setMeetupData(data);
-    //         } catch (err) {
-    //             console.error("Failed to load meetup:", err);
-    //         }
-    //     };
-
-    //     fetchMeetup();
-    // }, [eventCode]);
     useEffect(() => {
         const fetchMeetup = async () => {
             try {
@@ -123,18 +61,37 @@ function Results() {
         return () => clearInterval(interval);
     }, [eventCode]);
 
-    
-
-    // const mapLocation = meetupData?.mapLocation;
     const mapLocation = meetupData?.bestPlace || meetupData?.mapLocation;
     const participants = meetupData?.participants || [];
     const summary = meetupData?.summary;
+    const recommendations = meetupData?.recommendations || meetupData?.result?.items || [];
+    const venuesToDisplay = showAllVenues ? recommendations : recommendations.slice(0, 3);
 
-    const venueName = mapLocation?.name || 'Suggested Meetup Center';
-    const venueAddress = meetupData?.preferredArea || 'Near the current group center';
+    const handleRecalculate = async () => {
+        try {
+            const response = await fetch('/api/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventCode })
+            });
+            const result = await response.json();
 
-    const handleRecalculate = () => {
-        alert('Recalculate feature - will trigger backend recalculation');
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to recalculate');
+            }
+
+            const meetupResponse = await fetch(`/api/meetup/${eventCode}`);
+            const meetup = await meetupResponse.json();
+
+            if (!meetupResponse.ok) {
+                throw new Error(meetup.error || 'Failed to load meetup');
+            }
+
+            setMeetupData(meetup);
+            setError('');
+        } catch (err) {
+            setError(err.message || 'Failed to recalculate');
+        }
     };
 
     const handleShareResults = () => {
@@ -146,8 +103,6 @@ function Results() {
     const handleNewMeetup = () => {
         navigate('/');
     };
-
-    const venuesToDisplay = showAllVenues ? mockVenues : mockVenues.slice(0, 3);
 
     return (
         <div className="results-page">
@@ -242,15 +197,29 @@ function Results() {
 
                         {/* Right column - Venues list */}
                         <div className="venues-section">
-                            {summary ? (
+                            {venuesToDisplay.length > 0 ? (
+                                venuesToDisplay.map((venue) => (
+                                    <VenueCard
+                                        key={venue.itemId || `${venue.rank}-${venue.name}`}
+                                        rank={venue.rank}
+                                        name={venue.name}
+                                        address={venue.address || meetupData?.preferredArea || 'Greater Boston area'}
+                                        fairnessScore={venue.fairnessScore}
+                                        avgDistance={venue.avgDistance}
+                                        maxDistance={venue.maxDistance}
+                                        matchedPreferences={venue.matchedPreferences || []}
+                                        explanation={venue.explanation}
+                                    />
+                                ))
+                            ) : summary ? (
                                 <VenueCard
                                     rank={1}
-                                    name={venueName}
-                                    address={venueAddress}
+                                    name={mapLocation?.name || 'Suggested Meetup Center'}
+                                    address={mapLocation?.address || meetupData?.preferredArea || 'Greater Boston area'}
                                     fairnessScore={summary.fairnessScore}
                                     avgDistance={summary.avgDistance}
                                     maxDistance={summary.maxDistance}
-                                    matchedPreferences={summary.matchedPreferences}
+                                    matchedPreferences={summary.matchedPreferences || []}
                                     explanation={summary.explanation}
                                 />
                             ) : (
@@ -259,31 +228,15 @@ function Results() {
                                 </div>
                             )}
 
-                            {/* Mock venues after the real first one */}
-                            {(showAllVenues ? mockVenues.slice(0) : mockVenues.slice(0, 2)).map((venue, index) => (
-                                <VenueCard
-                                    key={venue.rank}
-                                    rank={index + 2}
-                                    name={venue.name}
-                                    address={venue.address}
-                                    fairnessScore={venue.fairnessScore}
-                                    avgDistance={venue.avgDistance}
-                                    maxDistance={venue.maxDistance}
-                                    matchedPreferences={venue.matchedPreferences}
-                                    explanation={venue.explanation}
-                                />
-                            ))}
-
-                            {/* Show more/less button */}
-                            {mockVenues.length > 2 && (
+                            {recommendations.length > 3 && (
                                 <div className="show-more-section">
                                     <button
                                         className="show-more-btn"
                                         onClick={() => setShowAllVenues(!showAllVenues)}
                                     >
                                         {showAllVenues
-                                            ? `Showing ${mockVenues.length + 1} results • Show less`
-                                            : `Showing top 3 results • More venues available in full version`
+                                            ? `Showing ${recommendations.length} results • Show less`
+                                            : `Showing top 3 results • Show all`
                                         }
                                     </button>
                                 </div>
