@@ -14,17 +14,32 @@ import './VenueCard.css';
  * @param {string} explanation - Why this venue was selected
  */
 function VenueCard({
-                       rank,
-                       name,
-                       address,
-                       fairnessScore,
-                       avgDistance,
-                       maxDistance,
-                       matchedPreferences = [],
-                       explanation
-                   }) {
+                        rank,
+                        name,
+                        address,
+                        fairnessScore,
+                        avgDistance,
+                        maxDistance,
+                        matchedPreferences = [],
+                        explanation,
+                        selected = false,
+                        onSelect,
+                        onNavigate
+                    }) {
     return (
-        <div className="venue-card">
+        <div
+            id={`venue-card-${rank}`}
+            className={`venue-card ${selected ? 'venue-card-selected' : ''}`}
+            onClick={onSelect}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect?.();
+                }
+            }}
+        >
             {/* Header with rank and name */}
             <div className="venue-header">
                 <div className="venue-rank">#{rank}</div>
@@ -74,6 +89,17 @@ function VenueCard({
                 <h4 className="section-title">Why this venue?</h4>
                 <p className="explanation-text">{explanation}</p>
             </div>
+
+            <button
+                type="button"
+                className="venue-map-link"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigate?.();
+                }}
+            >
+                Open in Google Maps
+            </button>
         </div>
     );
 }

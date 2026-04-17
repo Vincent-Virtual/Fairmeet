@@ -14,6 +14,15 @@ LOCAL_GEOCODES = {
     "brookline": (42.3318, -71.1212, "Brookline, Massachusetts"),
     "somerville": (42.3876, -71.0995, "Somerville, Massachusetts"),
     "downtown": (42.3555, -71.0604, "Downtown Boston, Massachusetts"),
+    "boston university": (42.3505, -71.1054, "Boston University, Boston, Massachusetts"),
+    "bu": (42.3505, -71.1054, "Boston University, Boston, Massachusetts"),
+    "northeastern": (42.3398, -71.0892, "Northeastern University, Boston, Massachusetts"),
+    "fenway": (42.3467, -71.0972, "Fenway, Boston, Massachusetts"),
+    "seaport": (42.3519, -71.0475, "Seaport District, Boston, Massachusetts"),
+    "north end": (42.3647, -71.0542, "North End, Boston, Massachusetts"),
+    "south end": (42.3413, -71.0772, "South End, Boston, Massachusetts"),
+    "malden": (42.4251, -71.0662, "Malden, Massachusetts"),
+    "quincy": (42.2529, -71.0023, "Quincy, Massachusetts"),
 }
 
 
@@ -33,31 +42,120 @@ def haversine_miles(lat1, lon1, lat2, lon2):
 
 
 def geocode_location(text):
-    # A few local shortcuts make demos faster and reduce calls to Nominatim
+    # A few local shortcuts make address lookup faster and reduce calls to Nominatim
     if not text:
         return None, None, None
 
     cleaned = text.strip().lower()
+    local_matches = []
     for key, value in LOCAL_GEOCODES.items():
-        if key in cleaned:
-            return value
+        if key == cleaned:
+            local_matches.append((0, -len(key), value))
+        elif key in cleaned:
+            local_matches.append((1, -len(key), value))
 
-    try:
-        response = requests.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": f"{text}, Massachusetts", "format": "jsonv2", "limit": 1},
-            headers={"User-Agent": "FairmeetPrototype/1.0"},
-            timeout=8,
-        )
-        response.raise_for_status()
-        results = response.json()
-        if results:
-            place = results[0]
-            return float(place["lat"]), float(place["lon"]), place.get("display_name")
-    except Exception as exc:
-        print("Geocode error:", exc)
+    if local_matches:
+        local_matches.sort()
+        return local_matches[0][2]
+
+    queries = [
+        text,
+        f"{text}, Boston, MA",
+        f"{text}, Massachusetts",
+        f"{text}, United States",
+    ]
+
+    for query in queries:
+        try:
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "limit": 1,
+                    "countrycodes": "us",
+                },
+                headers={"User-Agent": "FairmeetPrototype/1.0"},
+                timeout=8,
+            )
+            response.raise_for_status()
+            results = response.json()
+            if results:
+                place = results[0]
+                return float(place["lat"]), float(place["lon"]), place.get("display_name")
+        except Exception:
+            continue
 
     return None, None, None
+
+
+def geocode_suggestions(text, limit=5):
+    if not text or len(text.strip()) < 3:
+        return []
+
+    cleaned = text.strip().lower()
+    local_matches = []
+    for key, value in LOCAL_GEOCODES.items():
+        if cleaned in key or key in cleaned:
+            score = 2
+            if key == cleaned:
+                score = 0
+            elif key.startswith(cleaned) or cleaned.startswith(key):
+                score = 1
+            local_matches.append({
+                "label": value[2],
+                "lat": value[0],
+                "lon": value[1],
+                "score": score,
+                "source": "local",
+            })
+    local_matches.sort(key=lambda item: (item["score"], len(item["label"])))
+
+    queries = [
+        text,
+        f"{text}, Boston, MA",
+        f"{text}, Massachusetts",
+        f"{text}, United States",
+    ]
+
+    try:
+        remote_matches = []
+        for query in queries:
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "addressdetails": 1,
+                    "limit": limit,
+                    "countrycodes": "us",
+                },
+                headers={"User-Agent": "FairmeetPrototype/1.0"},
+                timeout=8,
+            )
+            response.raise_for_status()
+            for place in response.json():
+                remote_matches.append({
+                    "label": place.get("display_name"),
+                    "lat": float(place["lat"]),
+                    "lon": float(place["lon"]),
+                    "score": 3,
+                    "source": "nominatim",
+                })
+
+        seen = set()
+        suggestions = []
+        for item in local_matches + remote_matches:
+            if not item["label"] or item["label"] in seen:
+                continue
+            seen.add(item["label"])
+            item.pop("score", None)
+            suggestions.append(item)
+        return suggestions[:limit]
+    except Exception as exc:
+        for item in local_matches:
+            item.pop("score", None)
+        return local_matches[:limit]
 
 
 def compute_center(meetup, participants):
@@ -109,14 +207,44 @@ def sample_venues(activity_type, lat, lon):
     # Fallback venues keep the app usable if Overpass is slow or offline
     activity = (activity_type or "coffee").lower()
     templates = {
-        "coffee": [("Central Cafe", "cafe", "$"), ("Study Grounds", "cafe", "$$")],
-        "food": [("Fair Table Restaurant", "restaurant", "$$"), ("Neighborhood Kitchen", "restaurant", "$")],
-        "drinks": [("Meetup Pub", "bar", "$$"), ("Evening Tap", "pub", "$$")],
-        "study": [("Community Library", "library", "$"), ("Quiet Cafe", "cafe", "$")],
-        "entertainment": [("Central Cinema", "cinema", "$$"), ("Arts Theater", "theatre", "$$")],
+        "coffee": [
+            ("Central Cafe", "cafe", "$"),
+            ("Study Grounds", "cafe", "$$"),
+            ("Common Coffee", "cafe", "$"),
+            ("Corner Espresso", "cafe", "$$"),
+            ("Harbor Cafe", "cafe", "$$"),
+        ],
+        "food": [
+            ("Fair Table Restaurant", "restaurant", "$$"),
+            ("Neighborhood Kitchen", "restaurant", "$"),
+            ("Market Hall", "restaurant", "$$"),
+            ("Central Noodle", "restaurant", "$"),
+            ("Green Bowl", "restaurant", "$$"),
+        ],
+        "drinks": [
+            ("Meetup Pub", "bar", "$$"),
+            ("Evening Tap", "pub", "$$"),
+            ("Common Bar", "bar", "$"),
+            ("Union Lounge", "bar", "$$$"),
+            ("Quiet Pour", "pub", "$$"),
+        ],
+        "study": [
+            ("Community Library", "library", "$"),
+            ("Quiet Cafe", "cafe", "$"),
+            ("Reading Room", "library", "$"),
+            ("Study Grounds", "cafe", "$$"),
+            ("Learning Commons", "library", "$"),
+        ],
+        "entertainment": [
+            ("Central Cinema", "cinema", "$$"),
+            ("Arts Theater", "theatre", "$$"),
+            ("Music Hall", "entertainment", "$$"),
+            ("Game Lounge", "entertainment", "$"),
+            ("Gallery Night", "entertainment", "$$"),
+        ],
     }
     rows = templates.get(activity, templates["coffee"])
-    offsets = [(0.002, 0.002), (-0.002, 0.001), (0.001, -0.002)]
+    offsets = [(0.002, 0.002), (-0.002, 0.001), (0.001, -0.002), (-0.0015, -0.001), (0.0025, -0.0015)]
 
     venues = []
     for index, row in enumerate(rows):
@@ -208,8 +336,10 @@ def search_real_venues(lat, lon, activity_type, radius_m=1600):
             if len(venues) >= 12:
                 break
 
-        if venues:
-            return venues
+        if len(venues) < 5:
+            venues.extend(sample_venues(activity_type, lat, lon))
+
+        return venues
     except Exception as exc:
         print("Overpass venue search failed:", exc)
 

@@ -1,5 +1,5 @@
 // src/pages/Results.jsx
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     MapIcon,
@@ -13,17 +13,63 @@ import ParticipantCard from '../components/ParticipantCard';
 import Button from '../components/ui/Button';
 import './Results.css';
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 import L from 'leaflet';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-L.Marker.prototype.options.icon = L.icon({
-    iconUrl: markerIcon,
-    shadowUrl: markerShadow,
+const defaultCenter = [42.3601, -71.0589];
+
+function venueIcon(rank, selected) {
+    return L.divIcon({
+        className: '',
+        html: `<div class="venue-map-marker ${selected ? 'venue-map-marker-selected' : ''}">${rank}</div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        popupAnchor: [0, -18]
+    });
+}
+
+const participantIcon = L.divIcon({
+    className: '',
+    html: '<div class="self-map-marker"><span></span></div>',
+    iconSize: [32, 34],
+    iconAnchor: [16, 30],
+    popupAnchor: [0, -26]
 });
+
+function MapController({ points, selectedVenue }) {
+    const map = useMap();
+    const didFit = useRef(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => map.invalidateSize(), 80);
+        return () => clearTimeout(timer);
+    }, [map]);
+
+    useEffect(() => {
+        const validPoints = points.filter((point) => point.lat != null && point.lon != null);
+        if (!didFit.current && validPoints.length > 0) {
+            if (validPoints.length === 1) {
+                map.setView([validPoints[0].lat, validPoints[0].lon], 14);
+            } else {
+                const bounds = L.latLngBounds(validPoints.map((point) => [point.lat, point.lon]));
+                map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 });
+            }
+            didFit.current = true;
+        }
+    }, [map, points]);
+
+    useEffect(() => {
+        if (selectedVenue?.lat != null && selectedVenue?.lon != null) {
+            map.flyTo([selectedVenue.lat, selectedVenue.lon], Math.max(map.getZoom(), 14), {
+                duration: 0.4
+            });
+        }
+    }, [map, selectedVenue?.rank, selectedVenue?.lat, selectedVenue?.lon]);
+
+    return null;
+}
 
 function Results() {
     const { eventCode } = useParams();
@@ -31,9 +77,13 @@ function Results() {
 
     const [meetupData, setMeetupData] = useState(null);
     const [showAllVenues, setShowAllVenues] = useState(false);
-
+    const [selectedRank, setSelectedRank] = useState(null);
+    const [activePopupRank, setActivePopupRank] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [recalculating, setRecalculating] = useState(false);
     const [error, setError] = useState('');
+    const markerRefs = useRef({});
+
     useEffect(() => {
         const fetchMeetup = async () => {
             try {
@@ -41,14 +91,14 @@ function Results() {
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || "Failed to fetch meetup");
+                    throw new Error(data.error || 'Failed to fetch meetup');
                 }
 
                 setMeetupData(data);
                 setError('');
             } catch (err) {
-                console.error("Failed to load meetup:", err);
-                setError(err.message || "Failed to load meetup");
+                console.error('Failed to load meetup:', err);
+                setError(err.message || 'Failed to load meetup');
             } finally {
                 setLoading(false);
             }
@@ -61,14 +111,86 @@ function Results() {
         return () => clearInterval(interval);
     }, [eventCode]);
 
-    const mapLocation = meetupData?.bestPlace || meetupData?.mapLocation;
     const participants = meetupData?.participants || [];
     const summary = meetupData?.summary;
     const recommendations = meetupData?.recommendations || meetupData?.result?.items || [];
     const venuesToDisplay = showAllVenues ? recommendations : recommendations.slice(0, 3);
 
+    useEffect(() => {
+        if (recommendations.length === 0) {
+            setSelectedRank(null);
+            return;
+        }
+
+        const stillExists = recommendations.some((venue) => venue.rank === selectedRank);
+        if (!stillExists) {
+            setSelectedRank(recommendations[0].rank);
+        }
+    }, [recommendations, selectedRank]);
+
+    const selectedVenue = recommendations.find((venue) => venue.rank === selectedRank) || recommendations[0];
+    const viewerParticipantId = sessionStorage.getItem(`fairmeet_participant_${eventCode}`);
+    const viewerParticipant = participants.find((participant) => String(participant.id) === String(viewerParticipantId));
+    const ownerLocationText = sessionStorage.getItem(`fairmeet_owner_location_${eventCode}`);
+    const ownerLocation = ownerLocationText ? JSON.parse(ownerLocationText) : null;
+    const viewerLocation = viewerParticipant?.lat != null && viewerParticipant?.lon != null
+        ? {
+            lat: viewerParticipant.lat,
+            lon: viewerParticipant.lon,
+            label: viewerParticipant.location || viewerParticipant.locationName || 'Your location'
+        }
+        : ownerLocation;
+    const mapCenter = selectedVenue?.lat != null && selectedVenue?.lon != null
+        ? [selectedVenue.lat, selectedVenue.lon]
+        : defaultCenter;
+
+    const mapPoints = [
+        ...recommendations.map((venue) => ({ lat: venue.lat, lon: venue.lon })),
+        ...(viewerLocation ? [{ lat: viewerLocation.lat, lon: viewerLocation.lon }] : [])
+    ];
+
+    const openGoogleMaps = (venue) => {
+        if (venue?.lat == null || venue?.lon == null) return;
+
+        const params = new URLSearchParams({
+            api: '1',
+            destination: `${venue.lat},${venue.lon}`,
+            travelmode: 'driving'
+        });
+
+        if (viewerLocation?.lat != null && viewerLocation?.lon != null) {
+            params.set('origin', `${viewerLocation.lat},${viewerLocation.lon}`);
+        }
+
+        window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const selectVenue = (venue, options = {}) => {
+        const { shouldScroll = false, fromMap = false } = options;
+        setSelectedRank(venue.rank);
+        if (venue.rank > 3) {
+            setShowAllVenues(true);
+        }
+
+        if (!fromMap && activePopupRank != null) {
+            setTimeout(() => {
+                markerRefs.current[venue.rank]?.openPopup();
+            }, 120);
+        }
+
+        if (shouldScroll) {
+            setTimeout(() => {
+                document.getElementById(`venue-card-${venue.rank}`)?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }, 80);
+        }
+    };
+
     const handleRecalculate = async () => {
         try {
+            setRecalculating(true);
             const response = await fetch('/api/plan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -88,9 +210,12 @@ function Results() {
             }
 
             setMeetupData(meetup);
+            setSelectedRank(meetup.recommendations?.[0]?.rank || null);
             setError('');
         } catch (err) {
             setError(err.message || 'Failed to recalculate');
+        } finally {
+            setRecalculating(false);
         }
     };
 
@@ -110,67 +235,92 @@ function Results() {
 
             <main className="results-main">
                 <div className="results-container">
-
-                    {/* Page header */}
                     <div className="results-header">
-                        <h1 className="results-title">Recommended Venues</h1>
+                        <h1 className="results-title">
+                            {meetupData?.meetupName ? `${meetupData.meetupName} Results` : 'Recommended Venues'}
+                        </h1>
                         <p className="results-subtitle">
-                            Based on fairness calculation for all {meetupData?.participants?.length || 0} participants
+                            Recommended venues based on {meetupData?.activityType || 'meetup'} preferences and {participants.length} participants
                         </p>
                     </div>
 
-                    {/* Main content grid: Map (left) + Venues (right) */}
                     <div className="results-grid">
-
-                        {/* Left column - Map section */}
                         <div className="map-section">
                             <div className="map-header">
                                 <MapIcon className="map-header-icon" />
                                 <span className="map-title">Map View</span>
                             </div>
 
-                            <div className="map-placeholder" style={{ height: "320px" }}>
-                                {mapLocation && mapLocation.lat && mapLocation.lon ? (
+                            <div className="map-placeholder">
+                                {recommendations.length > 0 ? (
                                     <MapContainer
-                                        key={`${mapLocation.lat}-${mapLocation.lon}`}
-                                        center={[mapLocation.lat, mapLocation.lon]}
+                                        center={mapCenter}
                                         zoom={13}
-                                        scrollWheelZoom={false}
-                                        style={{ height: "100%", width: "100%" }}
+                                        scrollWheelZoom={true}
+                                        style={{ height: '100%', width: '100%' }}
                                     >
+                                        <MapController points={mapPoints} selectedVenue={selectedVenue} />
                                         <TileLayer
                                             attribution="&copy; OpenStreetMap contributors"
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         />
 
-                                        {/* Best place marker */}
-                                        <Marker position={[mapLocation.lat, mapLocation.lon]}>
-                                            <Popup>
-                                                {mapLocation.name || "Suggested Meetup Place"}
-                                            </Popup>
-                                        </Marker>
-
-                                        {/* Participant markers */}
-                                        {participants.map((participant, index) => (
-                                            participant.lat != null && participant.lon != null ? (
+                                        {recommendations.map((venue) => (
+                                            venue.lat != null && venue.lon != null ? (
                                                 <Marker
-                                                    key={participant.id || `${participant.name}-${index}`}
-                                                    position={[participant.lat, participant.lon]}
+                                                    key={venue.itemId || `${venue.rank}-${venue.name}`}
+                                                    ref={(ref) => {
+                                                        if (ref) {
+                                                            markerRefs.current[venue.rank] = ref;
+                                                        } else {
+                                                            delete markerRefs.current[venue.rank];
+                                                        }
+                                                    }}
+                                                    position={[venue.lat, venue.lon]}
+                                                    icon={venueIcon(venue.rank, venue.rank === selectedRank)}
+                                                    eventHandlers={{
+                                                        click: () => selectVenue(venue, { shouldScroll: true, fromMap: true }),
+                                                        popupopen: () => setActivePopupRank(venue.rank),
+                                                        popupclose: () => {
+                                                            setActivePopupRank((current) => current === venue.rank ? null : current);
+                                                        }
+                                                    }}
                                                 >
                                                     <Popup>
-                                                        <strong>{participant.name || 'Participant'}</strong>
+                                                        <strong>{venue.name}</strong>
                                                         <br />
-                                                        {participant.location || participant.locationName || 'Unknown location'}
+                                                        {venue.address || 'Greater Boston area'}
+                                                        <br />
+                                                        <button
+                                                            type="button"
+                                                            className="map-popup-button"
+                                                            onClick={() => openGoogleMaps(venue)}
+                                                        >
+                                                            Open in Google Maps
+                                                        </button>
                                                     </Popup>
                                                 </Marker>
                                             ) : null
                                         ))}
+
+                                        {viewerLocation?.lat != null && viewerLocation?.lon != null && (
+                                            <Marker
+                                                position={[viewerLocation.lat, viewerLocation.lon]}
+                                                icon={participantIcon}
+                                            >
+                                                <Popup>
+                                                    <strong>Your location</strong>
+                                                    <br />
+                                                    {viewerLocation.label || 'Selected location'}
+                                                </Popup>
+                                            </Marker>
+                                        )}
                                     </MapContainer>
                                 ) : (
                                     <div className="map-placeholder-content">
                                         <MapIcon className="map-placeholder-icon" />
                                         <p className="map-placeholder-text">
-                                            {loading ? "Loading map..." : "No location selected"}
+                                            {loading ? 'Loading map...' : 'No recommendation locations yet'}
                                         </p>
                                         {error && (
                                             <p className="map-placeholder-subtext">{error}</p>
@@ -179,23 +329,21 @@ function Results() {
                                 )}
                             </div>
 
-                            {/* Legend */}
                             <div className="map-legend">
                                 <h4 className="legend-title">Legend</h4>
                                 <div className="legend-items">
                                     <div className="legend-item">
-                                        <div className="legend-color participant-color"></div>
-                                        <span>Participants</span>
+                                        <div className="legend-color venue-color"></div>
+                                        <span>Recommended venues</span>
                                     </div>
                                     <div className="legend-item">
-                                        <div className="legend-color venue-color"></div>
-                                        <span>Venues</span>
+                                        <div className="legend-color participant-color"></div>
+                                        <span>Your location</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right column - Venues list */}
                         <div className="venues-section">
                             {venuesToDisplay.length > 0 ? (
                                 venuesToDisplay.map((venue) => (
@@ -209,18 +357,22 @@ function Results() {
                                         maxDistance={venue.maxDistance}
                                         matchedPreferences={venue.matchedPreferences || []}
                                         explanation={venue.explanation}
+                                        selected={venue.rank === selectedRank}
+                                        onSelect={() => selectVenue(venue)}
+                                        onNavigate={() => openGoogleMaps(venue)}
                                     />
                                 ))
                             ) : summary ? (
                                 <VenueCard
                                     rank={1}
-                                    name={mapLocation?.name || 'Suggested Meetup Center'}
-                                    address={mapLocation?.address || meetupData?.preferredArea || 'Greater Boston area'}
+                                    name={meetupData?.bestPlace?.name || 'Suggested Meetup Center'}
+                                    address={meetupData?.bestPlace?.address || meetupData?.preferredArea || 'Greater Boston area'}
                                     fairnessScore={summary.fairnessScore}
                                     avgDistance={summary.avgDistance}
                                     maxDistance={summary.maxDistance}
                                     matchedPreferences={summary.matchedPreferences || []}
                                     explanation={summary.explanation}
+                                    selected
                                 />
                             ) : (
                                 <div className="no-participants">
@@ -235,8 +387,8 @@ function Results() {
                                         onClick={() => setShowAllVenues(!showAllVenues)}
                                     >
                                         {showAllVenues
-                                            ? `Showing ${recommendations.length} results • Show less`
-                                            : `Showing top 3 results • Show all`
+                                            ? `Showing ${recommendations.length} results - Show less`
+                                            : 'Showing top 3 results - Show all'
                                         }
                                     </button>
                                 </div>
@@ -244,12 +396,12 @@ function Results() {
                         </div>
                     </div>
 
-                    {/* Action buttons - Avec icônes au lieu d'emojis */}
                     <div className="results-actions">
                         <Button
                             variant="primary"
                             onClick={handleRecalculate}
                             className="action-btn"
+                            loading={recalculating}
                         >
                             <ArrowPathIcon className="btn-icon-inline" />
                             Recalculate
@@ -272,20 +424,18 @@ function Results() {
                         </Button>
                     </div>
 
-                    {/* Participants section */}
                     <div className="participants-section">
                         <h2 className="participants-title">Participants in this Meetup</h2>
                         <div className="participants-grid">
-                            {meetupData?.participants?.map((participant) => (
+                            {participants.map((participant) => (
                                 <ParticipantCard
-                                    // key={participant.id}
                                     key={participant.id || `${participant.name}-${participant.location || ''}`}
                                     name={participant.name}
                                     location={participant.location}
                                 />
                             ))}
 
-                            {(!meetupData?.participants || meetupData.participants.length === 0) && (
+                            {participants.length === 0 && (
                                 <div className="no-participants">
                                     <p>No participants have joined yet.</p>
                                 </div>
@@ -293,10 +443,9 @@ function Results() {
                         </div>
                     </div>
 
-                    {/* Footer note */}
                     <div className="results-footer">
                         <p className="footer-note">
-                            FairMeet — Results are based on distance calculations and preference matching
+                            FairMeet - Results are based on distance calculations and preference matching
                         </p>
                     </div>
                 </div>

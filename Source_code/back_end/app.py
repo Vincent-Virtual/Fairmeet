@@ -3,6 +3,7 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 
 from services import MeetupService
+from search_engine import geocode_suggestions
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,8 @@ def create_meetup():
     try:
         meetup = service.createMeetup(data, base_url())
         return jsonify(meetup), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -103,6 +106,12 @@ def get_meetup(event_code):
         return jsonify({"error": str(exc)}), 404
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/geocode", methods=["GET"])
+def geocode_search():
+    query = request.args.get("q", "")
+    return jsonify({"suggestions": geocode_suggestions(query)}), 200
 
 
 @app.route("/api/health", methods=["GET"])

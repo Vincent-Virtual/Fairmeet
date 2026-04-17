@@ -5,7 +5,7 @@ from models import Meetup, Participant, RecommendationItem, RecommendationResult
 
 class MemoryDatabase:
     def __init__(self):
-        # Handy for quick demos when PostgreSQL is not running yet
+        # Handy for quick local runs when PostgreSQL is not running yet
         self.meetups = {}
         self.participants = {}
         self.venues = {}

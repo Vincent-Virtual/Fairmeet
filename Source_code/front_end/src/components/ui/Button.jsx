@@ -12,22 +12,23 @@ import './Button.css';
  * @param {string} type - Button type (button, submit, reset)
  */
 function Button({
-                    variant = 'primary',
-                    size = 'medium',
-                    onClick,
-                    children,
-                    className = '',
-                    disabled = false,
-                    type = 'button'
-                }) {
+                     variant = 'primary',
+                     size = 'medium',
+                     onClick,
+                     children,
+                     className = '',
+                     disabled = false,
+                     type = 'button',
+                     loading = false
+                 }) {
     return (
         <button
             type={type}
-            className={`btn btn-${variant} btn-${size} ${className}`}
+            className={`btn btn-${variant} btn-${size} ${loading ? 'btn-loading' : ''} ${className}`}
             onClick={onClick}
-            disabled={disabled}
+            disabled={disabled || loading}
         >
-            {children}
+            <span className="btn-content">{children}</span>
         </button>
     );
 }

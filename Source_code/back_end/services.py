@@ -31,7 +31,21 @@ class MeetupService:
         indoor_outdoor = data.get("indoorOutdoor") or "Any"
         created_at = data.get("createdAt")
 
-        lat, lon, area_name = geocode_location(preferred_area)
+        if not title.strip():
+            raise ValueError("Meetup name is required")
+
+        if not preferred_area:
+            raise ValueError("Preferred area is required")
+
+        lat = to_float(data.get("preferredAreaLat"))
+        lon = to_float(data.get("preferredAreaLon"))
+        area_name = data.get("preferredAreaName")
+
+        if lat is None or lon is None:
+            lat, lon, area_name = geocode_location(preferred_area)
+
+        if lat is None or lon is None:
+            raise ValueError("Please choose an address suggestion or pick the area on the map")
 
         meetup = Meetup(
             event_code=event_code,
