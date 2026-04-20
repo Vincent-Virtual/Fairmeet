@@ -122,6 +122,7 @@ def health():
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_react(path):
+    # Let React handle page routes after the built files are checked
     requested_path = os.path.join(DIST_DIR, path)
 
     if path and os.path.exists(requested_path):

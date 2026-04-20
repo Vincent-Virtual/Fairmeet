@@ -279,6 +279,7 @@ class PostgresDatabase:
                 result_row = cur.fetchone()
                 saved_result = self.row_to_result(result_row)
 
+                # Keep saved item ids on the objects so the response matches the rows
                 for item in result.ranked_venues:
                     cur.execute(
                         """

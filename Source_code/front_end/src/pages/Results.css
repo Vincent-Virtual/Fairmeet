@@ -37,10 +37,9 @@
 .results-title {
     font-size: var(--text-4xl);
     font-weight: var(--font-extrabold);
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-text-primary);
+    background: none;
+    -webkit-text-fill-color: currentColor;
     margin-bottom: var(--spacing-2);
     line-height: var(--leading-tight);
 }
@@ -167,6 +166,7 @@
 
 .legend-items {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-6);
 }
 
@@ -188,6 +188,11 @@
 
 .participant-color {
     background: var(--color-success);
+    border-radius: 50% 50% 45% 45%;
+}
+
+.selected-participant-color {
+    background: var(--color-primary-500);
     border-radius: 50% 50% 45% 45%;
 }
 
@@ -244,6 +249,37 @@
     height: 18px;
     border-radius: 12px 12px 8px 8px;
     background: var(--color-success);
+    border: 3px solid var(--color-white);
+}
+
+.selected-participant-map-marker {
+    position: relative;
+    width: 32px;
+    height: 34px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
+}
+
+.selected-participant-map-marker::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 9px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary-500);
+    border: 3px solid var(--color-white);
+}
+
+.selected-participant-map-marker::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 5px;
+    width: 22px;
+    height: 18px;
+    border-radius: 12px 12px 8px 8px;
+    background: var(--color-primary-500);
     border: 3px solid var(--color-white);
 }
 

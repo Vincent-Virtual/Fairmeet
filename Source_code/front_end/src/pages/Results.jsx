@@ -38,7 +38,15 @@ const participantIcon = L.divIcon({
     popupAnchor: [0, -26]
 });
 
-function MapController({ points, selectedVenue }) {
+const selectedParticipantIcon = L.divIcon({
+    className: '',
+    html: '<div class="selected-participant-map-marker"><span></span></div>',
+    iconSize: [32, 34],
+    iconAnchor: [16, 30],
+    popupAnchor: [0, -26]
+});
+
+function MapController({ points, selectedVenue, selectedParticipant }) {
     const map = useMap();
     const didFit = useRef(false);
 
@@ -68,6 +76,14 @@ function MapController({ points, selectedVenue }) {
         }
     }, [map, selectedVenue?.rank, selectedVenue?.lat, selectedVenue?.lon]);
 
+    useEffect(() => {
+        if (selectedParticipant?.lat != null && selectedParticipant?.lon != null) {
+            map.flyTo([selectedParticipant.lat, selectedParticipant.lon], Math.max(map.getZoom(), 14), {
+                duration: 0.4
+            });
+        }
+    }, [map, selectedParticipant?.id, selectedParticipant?.lat, selectedParticipant?.lon]);
+
     return null;
 }
 
@@ -78,11 +94,13 @@ function Results() {
     const [meetupData, setMeetupData] = useState(null);
     const [showAllVenues, setShowAllVenues] = useState(false);
     const [selectedRank, setSelectedRank] = useState(null);
+    const [selectedParticipantId, setSelectedParticipantId] = useState(null);
     const [activePopupRank, setActivePopupRank] = useState(null);
     const [loading, setLoading] = useState(true);
     const [recalculating, setRecalculating] = useState(false);
     const [error, setError] = useState('');
     const markerRefs = useRef({});
+    const participantMarkerRef = useRef(null);
 
     useEffect(() => {
         const fetchMeetup = async () => {
@@ -115,6 +133,24 @@ function Results() {
     const summary = meetupData?.summary;
     const recommendations = meetupData?.recommendations || meetupData?.result?.items || [];
     const venuesToDisplay = showAllVenues ? recommendations : recommendations.slice(0, 3);
+    const ownerLocationText = sessionStorage.getItem(`fairmeet_owner_location_${eventCode}`);
+    const ownerLocation = ownerLocationText ? JSON.parse(ownerLocationText) : null;
+    const participantKey = (participant) => String(
+        participant?.id || participant?.participantId || `${participant?.name || 'participant'}-${participant?.lat || ''}-${participant?.lon || ''}`
+    );
+    const hasCreatorParticipant = participants.some((participant) => participant.role === 'creator');
+    const visibleParticipants = !hasCreatorParticipant && ownerLocation
+        ? [{
+            id: 'local-creator',
+            participantId: 'local-creator',
+            name: 'Creator',
+            role: 'creator',
+            location: ownerLocation.label,
+            locationName: ownerLocation.label,
+            lat: ownerLocation.lat,
+            lon: ownerLocation.lon
+        }, ...participants]
+        : participants;
 
     useEffect(() => {
         if (recommendations.length === 0) {
@@ -128,11 +164,25 @@ function Results() {
         }
     }, [recommendations, selectedRank]);
 
+    useEffect(() => {
+        if (selectedParticipantId && !visibleParticipants.some((participant) => participantKey(participant) === selectedParticipantId)) {
+            setSelectedParticipantId(null);
+        }
+    }, [visibleParticipants, selectedParticipantId]);
+
     const selectedVenue = recommendations.find((venue) => venue.rank === selectedRank) || recommendations[0];
+    const selectedParticipant = visibleParticipants.find((participant) => participantKey(participant) === selectedParticipantId);
+    const selectedParticipantLocation = selectedParticipant?.lat != null && selectedParticipant?.lon != null
+        ? {
+            id: participantKey(selectedParticipant),
+            lat: selectedParticipant.lat,
+            lon: selectedParticipant.lon,
+            name: selectedParticipant.name || 'Participant',
+            label: selectedParticipant.location || selectedParticipant.locationName || 'Selected location'
+        }
+        : null;
     const viewerParticipantId = sessionStorage.getItem(`fairmeet_participant_${eventCode}`);
     const viewerParticipant = participants.find((participant) => String(participant.id) === String(viewerParticipantId));
-    const ownerLocationText = sessionStorage.getItem(`fairmeet_owner_location_${eventCode}`);
-    const ownerLocation = ownerLocationText ? JSON.parse(ownerLocationText) : null;
     const viewerLocation = viewerParticipant?.lat != null && viewerParticipant?.lon != null
         ? {
             lat: viewerParticipant.lat,
@@ -146,8 +196,10 @@ function Results() {
 
     const mapPoints = [
         ...recommendations.map((venue) => ({ lat: venue.lat, lon: venue.lon })),
-        ...(viewerLocation ? [{ lat: viewerLocation.lat, lon: viewerLocation.lon }] : [])
+        ...(viewerLocation ? [{ lat: viewerLocation.lat, lon: viewerLocation.lon }] : []),
+        ...(selectedParticipantLocation ? [{ lat: selectedParticipantLocation.lat, lon: selectedParticipantLocation.lon }] : [])
     ];
+    const hasMapPoints = mapPoints.some((point) => point.lat != null && point.lon != null);
 
     const openGoogleMaps = (venue) => {
         if (venue?.lat == null || venue?.lon == null) return;
@@ -186,6 +238,20 @@ function Results() {
                 });
             }, 80);
         }
+    };
+
+    const selectParticipant = (participant) => {
+        const key = participantKey(participant);
+        if (selectedParticipantId === key) {
+            setSelectedParticipantId(null);
+            participantMarkerRef.current?.closePopup();
+            return;
+        }
+
+        setSelectedParticipantId(key);
+        setTimeout(() => {
+            participantMarkerRef.current?.openPopup();
+        }, 150);
     };
 
     const handleRecalculate = async () => {
@@ -240,7 +306,7 @@ function Results() {
                             {meetupData?.meetupName ? `${meetupData.meetupName} Results` : 'Recommended Venues'}
                         </h1>
                         <p className="results-subtitle">
-                            Recommended venues based on {meetupData?.activityType || 'meetup'} preferences and {participants.length} participants
+                            Recommended venues based on {meetupData?.activityType || 'meetup'} preferences and {visibleParticipants.length} participants
                         </p>
                     </div>
 
@@ -252,14 +318,18 @@ function Results() {
                             </div>
 
                             <div className="map-placeholder">
-                                {recommendations.length > 0 ? (
+                                {hasMapPoints ? (
                                     <MapContainer
                                         center={mapCenter}
                                         zoom={13}
                                         scrollWheelZoom={true}
                                         style={{ height: '100%', width: '100%' }}
                                     >
-                                        <MapController points={mapPoints} selectedVenue={selectedVenue} />
+                                        <MapController
+                                            points={mapPoints}
+                                            selectedVenue={selectedVenue}
+                                            selectedParticipant={selectedParticipantLocation}
+                                        />
                                         <TileLayer
                                             attribution="&copy; OpenStreetMap contributors"
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -315,6 +385,21 @@ function Results() {
                                                 </Popup>
                                             </Marker>
                                         )}
+
+                                        {selectedParticipantLocation && (
+                                            <Marker
+                                                key={selectedParticipantLocation.id}
+                                                ref={participantMarkerRef}
+                                                position={[selectedParticipantLocation.lat, selectedParticipantLocation.lon]}
+                                                icon={selectedParticipantIcon}
+                                            >
+                                                <Popup>
+                                                    <strong>{selectedParticipantLocation.name}</strong>
+                                                    <br />
+                                                    {selectedParticipantLocation.label}
+                                                </Popup>
+                                            </Marker>
+                                        )}
                                     </MapContainer>
                                 ) : (
                                     <div className="map-placeholder-content">
@@ -340,6 +425,12 @@ function Results() {
                                         <div className="legend-color participant-color"></div>
                                         <span>Your location</span>
                                     </div>
+                                    {selectedParticipantLocation && (
+                                        <div className="legend-item">
+                                            <div className="legend-color selected-participant-color"></div>
+                                            <span>Selected participant</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -427,15 +518,21 @@ function Results() {
                     <div className="participants-section">
                         <h2 className="participants-title">Participants in this Meetup</h2>
                         <div className="participants-grid">
-                            {participants.map((participant) => (
+                            {visibleParticipants.map((participant) => (
                                 <ParticipantCard
                                     key={participant.id || `${participant.name}-${participant.location || ''}`}
                                     name={participant.name}
                                     location={participant.location}
+                                    selected={participantKey(participant) === selectedParticipantId}
+                                    onClick={
+                                        participant.lat != null && participant.lon != null
+                                            ? () => selectParticipant(participant)
+                                            : undefined
+                                    }
                                 />
                             ))}
 
-                            {participants.length === 0 && (
+                            {visibleParticipants.length === 0 && (
                                 <div className="no-participants">
                                     <p>No participants have joined yet.</p>
                                 </div>

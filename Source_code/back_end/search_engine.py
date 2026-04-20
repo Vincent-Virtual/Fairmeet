@@ -58,6 +58,7 @@ def geocode_location(text):
         local_matches.sort()
         return local_matches[0][2]
 
+    # Try wider versions too because users often type only a building or street name
     queries = [
         text,
         f"{text}, Boston, MA",
@@ -111,6 +112,7 @@ def geocode_suggestions(text, limit=5):
             })
     local_matches.sort(key=lambda item: (item["score"], len(item["label"])))
 
+    # Local results go first, then live map results fill in the detailed addresses
     queries = [
         text,
         f"{text}, Boston, MA",
@@ -267,6 +269,7 @@ def search_real_venues(lat, lon, activity_type, radius_m=1600):
     if lat is None or lon is None:
         lat, lon = 42.3601, -71.0589
 
+    # Overpass searches by map tags, so build the query from the activity choice
     filters = get_overpass_filters(activity_type)
     parts = []
     for key, value in filters:

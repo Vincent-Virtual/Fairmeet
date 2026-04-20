@@ -62,6 +62,20 @@ class MeetupService:
 
         meetup = self.database.create_meetup(meetup, self.make_share_uri(base_url, event_code))
 
+        # The creator also counts as a participant for distance scoring
+        self.addParticipantFromData(meetup, {
+            "name": data.get("creatorName") or data.get("ownerName") or "Creator",
+            "role": "creator",
+            "location": preferred_area,
+            "locationName": area_name,
+            "lat": lat,
+            "lon": lon,
+            "budgetPreference": budget_level,
+            "activityPreference": activity_type,
+            "indoorOutdoor": indoor_outdoor,
+            "createdAt": created_at,
+        })
+
         for participant_data in data.get("participants", []):
             self.addParticipantFromData(meetup, participant_data)
 
