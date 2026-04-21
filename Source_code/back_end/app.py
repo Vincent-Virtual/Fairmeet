@@ -2,6 +2,7 @@ import requests
 import os
 from flask import Flask, request, jsonify, send_from_directory
 import math
+from search_engine import *
 
 # --------------------------------------------------
 # Paths
@@ -16,130 +17,6 @@ app = Flask(__name__)
 
 
 meetups = {}
-
-
-
-def haversine_miles(lat1, lon1, lat2, lon2):
-    if None in (lat1, lon1, lat2, lon2):
-        return None
-
-    R = 3958.8  # Earth radius in miles
-
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-    return R * c
-
-def build_meetup_summary(meetup):
-    best_place = meetup.get("bestPlace") or meetup.get("mapLocation") or {}
-    participants = meetup.get("participants", [])
-
-    distances = []
-    for p in participants:
-        d = haversine_miles(
-            p.get("lat"),
-            p.get("lon"),
-            best_place.get("lat"),
-            best_place.get("lon")
-        )
-        if d is not None:
-            distances.append(d)
-
-    avg_distance = round(sum(distances) / len(distances), 1) if distances else 0.0
-    max_distance = round(max(distances), 1) if distances else 0.0
-
-    raw_score = 100 - 5 * avg_distance - 2 * max_distance
-    fairness_score = max(0, min(100, round(raw_score)))
-
-    matched_preferences = []
-    if meetup.get("activityType"):
-        matched_preferences.append(meetup["activityType"].capitalize())
-    if meetup.get("indoorOutdoor"):
-        matched_preferences.append(meetup["indoorOutdoor"])
-    if meetup.get("budget"):
-        matched_preferences.append(meetup["budget"])
-
-    explanation = (
-        f"This suggested place balances travel for the current group. "
-        f"The average distance is {avg_distance} miles and the furthest participant "
-        f"travels {max_distance} miles. It aligns with the selected preferences."
-    )
-
-    return {
-        "fairnessScore": fairness_score,
-        "avgDistance": avg_distance,
-        "maxDistance": max_distance,
-        "matchedPreferences": matched_preferences,
-        "explanation": explanation
-    }
-
-
-def geocode_location(text):
-    if not text:
-        return None, None, None
-
-    query = f"{text}, Massachusetts"
-
-    try:
-        response = requests.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={
-                "q": query,
-                "format": "jsonv2",
-                "limit": 1
-            },
-            headers={
-                "User-Agent": "FairmeetPrototype/1.0"
-            },
-            timeout=10
-        )
-
-        results = response.json()
-
-        if results:
-            place = results[0]
-            return (
-                float(place["lat"]),
-                float(place["lon"]),
-                place.get("display_name")
-            )
-
-    except Exception as e:
-        print("Geocode error:", e)
-
-    return None, None, None
-
-def compute_best_place(meetup):
-    points = []
-
-    # preferred area pulls center slightly
-    if meetup.get("preferredAreaLat"):
-        points.append((
-            meetup["preferredAreaLat"],
-            meetup["preferredAreaLon"]
-        ))
-
-    for p in meetup["participants"]:
-        points.append((p["lat"], p["lon"]))
-
-    if not points:
-        return None
-
-    avg_lat = sum(p[0] for p in points) / len(points)
-    avg_lon = sum(p[1] for p in points) / len(points)
-
-    print("new best place", (avg_lat, avg_lon))
-    return {
-        "name": "Suggested Meetup Center",
-        "lat": avg_lat,
-        "lon": avg_lon
-    }
-
 
 # --------------------------------------------------
 # API routes
@@ -264,7 +141,7 @@ def create_meetup():
         lat, lon, location_name = geocode_location(preferred_area)
         print("Preferred area geocoded to:", lat, lon)
 
-    meetups[event_code] = {
+        meetups[event_code] = {
         "message": "Meetup created successfully",
         "eventCode": event_code,
         "meetupName": meetup_name,
@@ -273,30 +150,18 @@ def create_meetup():
         "preferredArea": preferred_area,
         "indoorOutdoor": indoor_outdoor,
         "createdAt": created_at,
-
-        # keep existing field
         "participants": participants,
-
-        # keep existing field for map display
-        "mapLocation": {
-            "name": location_name,
-            "lat": lat,
-            "lon": lon
-        },
-
-        # extra fields for future recomputation
         "preferredAreaLat": lat,
         "preferredAreaLon": lon,
-        "preferredAreaName": location_name,
-
-        # new current recommendation
-        "bestPlace": {
-            "name": location_name or "Preferred Area",
-            "lat": lat,
-            "lon": lon
-        }
+        "preferredAreaName": location_name
     }
 
+    center = compute_best_place(meetups[event_code])
+    venues = search_real_venues(center["lat"], center["lon"], activity_type)
+    best_place = choose_best_venue(meetups[event_code], venues, center)
+
+    meetups[event_code]["bestPlace"] = best_place
+    meetups[event_code]["mapLocation"] = best_place
     meetups[event_code]["summary"] = build_meetup_summary(meetups[event_code])
 
     return jsonify(meetups[event_code]), 200
@@ -329,12 +194,12 @@ def join_meetup():
     }
     print(name, location_name)
 
-    meetup["participants"].append(new_participant)
+    center = compute_best_place(meetup)
+    venues = search_real_venues(center["lat"], center["lon"], meetup.get("activityType"))
+    best_place = choose_best_venue(meetup, venues, center)
 
-    meetup["bestPlace"] = compute_best_place(meetup)
-
-    # keep mapLocation synced with current recommendation
-    meetup["mapLocation"] = meetup["bestPlace"]
+    meetup["bestPlace"] = best_place
+    meetup["mapLocation"] = best_place
     meetup["summary"] = build_meetup_summary(meetup)
 
     return jsonify(meetup), 200
