@@ -192,7 +192,8 @@ def join_meetup():
         "lat": lat,
         "lon": lon
     }
-    print(name, location_name)
+    # print(name, location_name)
+    meetup["participants"].append(new_participant)
 
     center = compute_best_place(meetup)
     venues = search_real_venues(center["lat"], center["lon"], meetup.get("activityType"))
