@@ -1,0 +1,299 @@
+/* src/pages/EventCreated.css */
+
+/**
+ * EventCreated Page Styles
+ * Success page with SOLID BLUE code display
+ */
+
+/* ========================================
+   PAGE CONTAINER
+   ======================================== */
+
+.event-created-page {
+    min-height: 100vh;
+    background-color: var(--color-background);
+}
+
+.event-created-main {
+    padding: var(--spacing-8) var(--container-padding);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - var(--header-height));
+}
+
+.event-created-container {
+    max-width: 700px;
+    width: 100%;
+    background-color: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-3xl);
+    padding: var(--spacing-12) var(--spacing-8);
+    text-align: center;
+    box-shadow: var(--shadow-xl);
+    animation: scaleIn 0.5s var(--ease-out);
+}
+
+/* ========================================
+   SUCCESS ICON
+   ======================================== */
+
+.success-icon {
+    margin-bottom: var(--spacing-6);
+    display: flex;
+    justify-content: center;
+    animation: scaleIn 0.6s var(--ease-bounce) 0.2s backwards;
+}
+
+.success-icon-svg {
+    width: 80px;
+    height: 80px;
+    color: var(--color-primary-500);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 4px 12px rgba(23, 187, 232, 0.3));
+}
+
+/* ========================================
+   SUCCESS MESSAGE
+   ======================================== */
+
+.success-title {
+    font-size: var(--text-4xl);
+    font-weight: var(--font-extrabold);
+    color: var(--color-primary-600);  /* ✅ BLUE TEXT instead of gradient */
+    margin-bottom: var(--spacing-3);
+    line-height: var(--leading-tight);
+    animation: slideInUp 0.5s var(--ease-out) 0.3s backwards;
+}
+
+.success-subtitle {
+    font-size: var(--text-lg);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-8);
+    line-height: var(--leading-relaxed);
+    animation: slideInUp 0.5s var(--ease-out) 0.4s backwards;
+}
+
+/* ========================================
+   EVENT CODE SECTION
+   ======================================== */
+
+.event-code-section {
+    margin-bottom: var(--spacing-8);
+    animation: slideInUp 0.5s var(--ease-out) 0.5s backwards;
+}
+
+.code-label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-3);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+}
+
+.code-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    background: var(--color-primary-500);  /* ✅ SOLID BLUE */
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-6) var(--spacing-6);
+    box-shadow: var(--shadow-primary-lg);
+    transition: all var(--transition-base);
+}
+
+.code-display:hover {
+    background: var(--color-primary-600);  /* Darker on hover */
+    box-shadow:
+            var(--shadow-primary-lg),
+            0 20px 40px rgba(91, 141, 239, 0.3);
+    transform: translateY(-2px);
+}
+
+.code-text {
+    flex: 1;
+    font-size: var(--text-3xl);
+    font-weight: var(--font-extrabold);
+    font-family: var(--font-mono);
+    color: var(--color-white);
+    letter-spacing: var(--tracking-widest);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.copy-button {
+    padding: var(--spacing-3) var(--spacing-6);
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    background-color: var(--color-white);
+    color: var(--color-primary-600);
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.copy-button:hover {
+    background-color: var(--color-gray-50);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.copy-button:active {
+    transform: scale(0.98);
+}
+
+/* ========================================
+   MEETUP DETAILS
+   ======================================== */
+
+.meetup-details {
+    background: linear-gradient(135deg, rgba(91, 141, 239, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+    border: 1px solid rgba(91, 141, 239, 0.2);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-6);
+    margin-bottom: var(--spacing-8);
+    text-align: left;
+    animation: slideInUp 0.5s var(--ease-out) 0.6s backwards;
+}
+
+.meetup-details h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-4);
+}
+
+.meetup-details p {
+    font-size: var(--text-base);
+    color: var(--color-text-secondary);
+    margin: var(--spacing-2) 0;
+    line-height: var(--leading-relaxed);
+}
+
+.meetup-details strong {
+    color: var(--color-text-primary);
+    font-weight: var(--font-semibold);
+}
+
+/* ========================================
+   SHARE SECTION
+   ======================================== */
+
+.share-section {
+    margin-bottom: var(--spacing-8);
+    animation: slideInUp 0.5s var(--ease-out) 0.7s backwards;
+}
+
+.share-label {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-3);
+    font-weight: var(--font-medium);
+}
+
+.share-link-container {
+    display: flex;
+    gap: var(--spacing-2);
+}
+
+.share-link-input {
+    flex: 1;
+    padding: var(--spacing-3) var(--spacing-4);
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+    background-color: var(--color-gray-50);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    outline: none;
+    transition: all var(--transition-base);
+}
+
+.share-link-input:focus {
+    border-color: var(--color-primary-500);
+    background-color: var(--color-white);
+}
+
+.share-button {
+    padding: var(--spacing-3) var(--spacing-6);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    background-color: var(--color-white);
+    color: var(--color-primary-600);
+    border: 2px solid var(--color-primary-500);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    white-space: nowrap;
+}
+
+.share-button:hover {
+    background-color: var(--color-primary-50);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.share-button:active {
+    transform: translateY(0);
+}
+
+/* ========================================
+   EVENT ACTIONS
+   ======================================== */
+
+.event-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+    animation: slideInUp 0.5s var(--ease-out) 0.8s backwards;
+}
+
+.event-actions button {
+    width: 100%;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .event-created-main {
+        padding: var(--spacing-6) var(--spacing-4);
+    }
+
+    .event-created-container {
+        padding: var(--spacing-8) var(--spacing-6);
+        border-radius: var(--radius-2xl);
+    }
+
+    .success-icon svg {
+        width: 64px;
+        height: 64px;
+    }
+
+    .success-title {
+        font-size: var(--text-3xl);
+    }
+
+    .success-subtitle {
+        font-size: var(--text-base);
+    }
+
+    .code-text {
+        font-size: var(--text-xl);
+    }
+
+    .share-link-container {
+        flex-direction: column;
+    }
+
+    .share-button {
+        width: 100%;
+    }
+}

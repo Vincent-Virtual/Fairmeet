@@ -1,0 +1,94 @@
+/* src/components/Header.css */
+
+/**
+ * Header Component Styles
+ * Sticky navigation with SOLID BLUE logo
+ */
+
+/* ========================================
+   HEADER CONTAINER
+   ======================================== */
+
+.header {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background-color: var(--color-white);
+    border-bottom: 1px solid var(--color-border-light);
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.95);
+}
+
+.header-container {
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    padding: var(--spacing-4) var(--container-padding);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--header-height);
+}
+
+/* ========================================
+   LOGO
+   ======================================== */
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    text-decoration: none;
+    color: var(--color-text-primary);
+    font-weight: var(--font-bold);
+    font-size: var(--text-xl);
+    transition: transform var(--transition-base);
+}
+
+.logo:hover {
+    transform: translateY(-2px);
+}
+
+/* Logo Icon - SOLID BLUE (no gradient) */
+.logo-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--color-primary-500);  /* ✅ SOLID BLUE */
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-white);
+    box-shadow: var(--shadow-primary);  /* Blue-tinted shadow */
+    transition: all var(--transition-base);
+}
+
+.logo:hover .logo-icon {
+    box-shadow: var(--shadow-primary-lg);
+    transform: scale(1.05);
+    background: var(--color-primary-600);  /* Darker on hover */
+}
+
+.logo-text {
+    font-weight: var(--font-bold);
+    font-size: var(--text-xl);
+    color: var(--color-primary-600);  /* Blue text instead of gradient */
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .logo-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .logo-text {
+        font-size: var(--text-lg);
+    }
+}

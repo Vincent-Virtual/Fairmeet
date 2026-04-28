@@ -1,0 +1,163 @@
+/* src/components/ui/Card.css */
+
+/**
+ * Card Component Styles
+ * Feature cards with gradient hover effects
+ */
+
+/* ========================================
+   FEATURE CARD
+   ======================================== */
+
+.feature-card {
+    /* Layout */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-4);
+    padding: var(--spacing-8);
+
+    /* Appearance */
+    background-color: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+
+    /* Transitions */
+    transition: all var(--transition-slow);
+
+    /* Text alignment */
+    text-align: center;
+}
+
+/* Hover State - Lift with gradient shadow */
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow:
+            var(--shadow-xl),
+            0 10px 40px rgba(139, 92, 246, 0.15);
+    border-color: var(--color-primary-400);
+}
+
+/* ========================================
+   FEATURE ICON
+   ======================================== */
+
+.feature-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-2);
+    transition: transform var(--transition-base);
+}
+
+.feature-card:hover .feature-icon {
+    transform: scale(1.1);
+}
+.feature-icon {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-4);
+    transition: transform var(--transition-base);
+    background: linear-gradient(135deg, rgba(23, 187, 232, 0.1) 0%, rgba(69, 200, 237, 0.1) 100%);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-4);
+}
+
+.feature-card:hover .feature-icon {
+    transform: scale(1.1);
+}
+
+
+/* ========================================
+   FEATURE CONTENT
+   ======================================== */
+
+.feature-title {
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    color: var(--color-text-primary);
+    margin: 0;
+    line-height: var(--leading-tight);
+}
+
+.feature-description {
+    font-size: var(--text-base);
+    color: var(--color-text-secondary);
+    line-height: var(--leading-relaxed);
+    margin: 0;
+}
+
+/* ========================================
+   CARD VARIATIONS
+   ======================================== */
+
+/* Simple Card */
+.card {
+    background-color: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-base);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* Card with gradient border on hover */
+.card-gradient-border {
+    position: relative;
+    background-color: var(--color-white);
+    border: 2px solid transparent;
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-6);
+    transition: all var(--transition-base);
+    background-clip: padding-box;
+}
+
+.card-gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-xl);
+    padding: 2px;
+    background: var(--gradient-primary);
+    -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+.card-gradient-border:hover::before {
+    opacity: 1;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .feature-card {
+        padding: var(--spacing-6);
+    }
+
+    .feature-icon {
+        width: 56px;
+        height: 56px;
+    }
+
+    .icon-placeholder {
+        width: 48px;
+        height: 48px;
+    }
+}

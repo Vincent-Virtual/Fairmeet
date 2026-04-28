@@ -1,0 +1,130 @@
+/* src/pages/CreateMeetup.css */
+
+/**
+ * CreateMeetup Page Styles
+ * Form with SOLID BLUE hero section
+ */
+
+/* ========================================
+   PAGE CONTAINER
+   ======================================== */
+
+.create-meetup-page {
+    min-height: 100vh;
+    background-color: var(--color-background);
+}
+
+.create-meetup-main {
+    padding: var(--spacing-8) var(--container-padding);
+    display: flex;
+    justify-content: center;
+    min-height: calc(100vh - var(--header-height));
+}
+
+.create-meetup-container {
+    max-width: 700px;
+    width: 100%;
+    animation: fadeIn 0.5s var(--ease-out);
+}
+
+/* ========================================
+   PAGE HERO - SOLID BLUE
+   ======================================== */
+
+.page-hero {
+    background: var(--color-primary-500);  /* ✅ SOLID BLUE */
+    padding: var(--spacing-12) var(--spacing-8);
+    border-radius: var(--radius-3xl) var(--radius-3xl) 0 0;
+    text-align: center;
+    color: var(--color-white);
+    animation: slideInDown 0.6s var(--ease-out);
+    box-shadow: var(--shadow-primary);
+}
+
+.page-hero-title {
+    font-size: var(--text-4xl);
+    font-weight: var(--font-extrabold);
+    color: var(--color-white);
+    margin-bottom: var(--spacing-3);
+    line-height: var(--leading-tight);
+}
+
+.page-hero-subtitle {
+    font-size: var(--text-lg);
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 1;
+    margin: 0;
+    font-weight: var(--font-medium);
+    line-height: var(--leading-relaxed);
+}
+
+/* ========================================
+   FORM
+   ======================================== */
+
+.create-meetup-form {
+    background-color: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-3xl) var(--radius-3xl);
+    padding: var(--spacing-10) var(--spacing-8) var(--spacing-8);
+    box-shadow: var(--shadow-xl);
+    animation: scaleIn 0.5s var(--ease-out) 0.2s backwards;
+}
+
+.form-section {
+    margin-bottom: var(--spacing-6);
+}
+
+.form-section:last-of-type {
+    margin-bottom: var(--spacing-8);
+}
+
+/* ========================================
+   FORM ACTIONS
+   ======================================== */
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+    margin-top: var(--spacing-8);
+    padding-top: var(--spacing-8);
+    border-top: 1px solid var(--color-border-light);
+}
+
+.form-actions button {
+    width: 100%;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .create-meetup-main {
+        padding: var(--spacing-6) var(--spacing-4);
+    }
+
+    .page-hero {
+        padding: var(--spacing-10) var(--spacing-6);
+        border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    }
+
+    .page-hero-title {
+        font-size: var(--text-3xl);
+    }
+
+    .page-hero-subtitle {
+        font-size: var(--text-base);
+    }
+
+    .create-meetup-form {
+        padding: var(--spacing-8) var(--spacing-6) var(--spacing-6);
+        border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+    }
+
+    .form-section {
+        margin-bottom: var(--spacing-5);
+    }
+}
