@@ -114,7 +114,7 @@ function EventCreated() {
                     {/* Actions - Sans emojis */}
                     <div className="event-actions">
                         <Button variant="primary" size="large" onClick={handleViewResults} className="btn-cta">
-                            View Results (Demo)
+                            View Results
                         </Button>
                         <Button variant="secondary" size="large" onClick={handleNewMeetup}>
                             Create New Meetup

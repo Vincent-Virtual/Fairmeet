@@ -1,8 +1,9 @@
 // src/pages/JoinMeetup.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Input from '../components/ui/Input';
+import AddressInput from '../components/ui/AddressInput';
 import Select from '../components/ui/Select';
 import ToggleButton from '../components/ui/ToggleButton';
 import Button from '../components/ui/Button';
@@ -27,7 +28,10 @@ function JoinMeetup() {
 
     const [meetupData, setMeetupData] = useState(null);
     const [error, setError] = useState('');
+    const [locationError, setLocationError] = useState('');
     const [preferencesLocked, setPreferencesLocked] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const locationRef = useRef(null);
 
     // Budget options
     const budgetOptions = [
@@ -94,13 +98,43 @@ function JoinMeetup() {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: value
+            [name]: value,
+            ...(name === 'location' ? {
+                lat: null,
+                lon: null,
+                locationName: ''
+            } : {})
         }));
 
         // If event code is being edited, validate it
         if (name === 'eventCode' && value.length >= 6) {
             loadMeetupData(value);
         }
+
+        if (name === 'location') {
+            setLocationError('');
+        }
+    };
+
+    const scrollToLocation = () => {
+        setTimeout(() => {
+            locationRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }, 0);
+    };
+
+    const handleLocationSelect = (suggestion) => {
+        setFormData(prev => ({
+            ...prev,
+            location: suggestion.label,
+            locationName: suggestion.label,
+            lat: suggestion.lat,
+            lon: suggestion.lon
+        }));
+        setError('');
+        setLocationError('');
     };
 
     // Handle indoor/outdoor selection
@@ -111,49 +145,6 @@ function JoinMeetup() {
         }));
     };
 
-    // // Handle form submission
-    // const handleSubmit = (e) => {
-    //     e.preventDefault();
-
-    //     // Validate event code
-    //     if (!meetupData) {
-    //         setError('Please enter a valid event code');
-    //         return;
-    //     }
-
-    //     // Validate location
-    //     if (!formData.location.trim()) {
-    //         setError('Please enter your location');
-    //         return;
-    //     }
-
-    //     // Create participant data
-    //     const participant = {
-    //         id: Math.random().toString(36).substring(2, 9),
-    //         name: formData.name || 'Anonymous',
-    //         location: formData.location,
-    //         budgetPreference: formData.budgetPreference,
-    //         indoorOutdoor: formData.indoorOutdoor,
-    //         joinedAt: new Date().toISOString()
-    //     };
-
-    //     // Add participant to meetup
-    //     const updatedMeetup = {
-    //         ...meetupData,
-    //         participants: [...(meetupData.participants || []), participant]
-    //     };
-
-    //     // Save updated meetup data
-    //     localStorage.setItem(`meetup_${formData.eventCode.toUpperCase()}`, JSON.stringify(updatedMeetup));
-
-    //     // Navigate to results page (or waiting page if not enough participants)
-    //     if (updatedMeetup.participants.length >= 2) {
-    //         navigate(`/results/${formData.eventCode.toUpperCase()}`);
-    //     } else {
-    //         // For now, go to results anyway (demo purposes)
-    //         navigate(`/results/${formData.eventCode.toUpperCase()}`);
-    //     }
-    // };
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -163,11 +154,19 @@ function JoinMeetup() {
         }
 
         if (!formData.location.trim()) {
-            setError('Please enter your location');
+            setLocationError('Please enter your location');
+            scrollToLocation();
+            return;
+        }
+
+        if (formData.lat == null || formData.lon == null) {
+            setLocationError('Please choose an address suggestion or pick your location on the map');
+            scrollToLocation();
             return;
         }
 
         try {
+            setIsSubmitting(true);
             const response = await fetch('/api/join-meetup', {
                 method: 'POST',
                 headers: {
@@ -177,6 +176,9 @@ function JoinMeetup() {
                     eventCode: formData.eventCode.toUpperCase(),
                     name: formData.name || 'Anonymous',
                     location: formData.location,
+                    locationName: formData.locationName,
+                    lat: formData.lat,
+                    lon: formData.lon,
                     budgetPreference: formData.budgetPreference,
                     indoorOutdoor: formData.indoorOutdoor
                 })
@@ -188,9 +190,21 @@ function JoinMeetup() {
                 throw new Error(updatedMeetup.error || 'Failed to join meetup');
             }
 
+            const joinedParticipant = updatedMeetup.participants?.[updatedMeetup.participants.length - 1];
+            if (joinedParticipant?.id) {
+                sessionStorage.setItem(`fairmeet_participant_${formData.eventCode.toUpperCase()}`, joinedParticipant.id);
+            }
+            sessionStorage.setItem(`fairmeet_owner_location_${formData.eventCode.toUpperCase()}`, JSON.stringify({
+                label: formData.locationName || formData.location,
+                lat: formData.lat,
+                lon: formData.lon
+            }));
+
             navigate(`/results/${formData.eventCode.toUpperCase()}`);
         } catch (err) {
             setError(err.message || 'Failed to join meetup');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -216,7 +230,7 @@ function JoinMeetup() {
                     </div>
 
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="join-meetup-form">
+                    <form onSubmit={handleSubmit} className="join-meetup-form" noValidate>
                         {/* Event Code Section */}
                         <div className="form-section highlighted">
                             <Input
@@ -258,15 +272,17 @@ function JoinMeetup() {
 
                         {/* Your Location */}
                         <div className="form-section highlighted">
-                            <Input
+                            <AddressInput
+                                ref={locationRef}
                                 label="Your Location"
-                                type="text"
                                 name="location"
                                 placeholder="e.g., 123 Main St, City, State or ZIP code"
                                 value={formData.location}
                                 onChange={handleInputChange}
+                                onSelectSuggestion={handleLocationSelect}
                                 required
-                                helperText="Required to calculate fair meeting spots"
+                                errorText={locationError}
+                                helperText="Pick a suggested address when possible"
                             />
                         </div>
 
@@ -315,6 +331,7 @@ function JoinMeetup() {
                                 variant="primary"
                                 size="large"
                                 disabled={!meetupData}
+                                loading={isSubmitting}
                             >
                                 Join Meetup
                             </Button>

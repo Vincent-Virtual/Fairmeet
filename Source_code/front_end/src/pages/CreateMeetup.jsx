@@ -1,8 +1,9 @@
 // src/pages/CreateMeetup.jsx
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Input from '../components/ui/Input';
+import AddressInput from '../components/ui/AddressInput';
 import Select from '../components/ui/Select';
 import ToggleButton from '../components/ui/ToggleButton';
 import Button from '../components/ui/Button';
@@ -17,6 +18,10 @@ function CreateMeetup() {
         budget: '',
         indoorOutdoor: 'Any'
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [locationError, setLocationError] = useState('');
+    const [formError, setFormError] = useState('');
+    const locationRef = useRef(null);
 
     const activityOptions = [
         { value: 'coffee', label: 'Coffee' },
@@ -38,8 +43,37 @@ function CreateMeetup() {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: value
+            [name]: value,
+            ...(name === 'preferredArea' ? {
+                preferredAreaLat: null,
+                preferredAreaLon: null,
+                preferredAreaName: ''
+            } : {})
         }));
+        setFormError('');
+        if (name === 'preferredArea') {
+            setLocationError('');
+        }
+    };
+
+    const scrollToLocation = () => {
+        setTimeout(() => {
+            locationRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }, 0);
+    };
+
+    const handlePreferredAreaSelect = (suggestion) => {
+        setFormData(prev => ({
+            ...prev,
+            preferredArea: suggestion.label,
+            preferredAreaLat: suggestion.lat,
+            preferredAreaLon: suggestion.lon,
+            preferredAreaName: suggestion.label
+        }));
+        setLocationError('');
     };
 
     const handleIndoorOutdoorSelect = (value) => {
@@ -67,6 +101,27 @@ function CreateMeetup() {
     // };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setFormError('');
+        setLocationError('');
+
+        if (!formData.meetupName.trim()) {
+            setFormError('Please enter a meetup name');
+            return;
+        }
+
+        if (!formData.preferredArea?.trim()) {
+            setLocationError('Please enter an address or pick the area on the map');
+            scrollToLocation();
+            return;
+        }
+
+        if (formData.preferredAreaLat == null || formData.preferredAreaLon == null) {
+            setLocationError('Please choose an address suggestion or pick the area on the map');
+            scrollToLocation();
+            return;
+        }
+
+        setIsSubmitting(true);
 
         const eventCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -92,13 +147,18 @@ function CreateMeetup() {
 
             const result = await response.json();
 
-            // optional: keep localStorage too, if teammate flow still uses it
-            localStorage.setItem(`meetup_${eventCode}`, JSON.stringify(meetupData));
+            sessionStorage.setItem(`fairmeet_owner_location_${result.eventCode}`, JSON.stringify({
+                label: formData.preferredAreaName || formData.preferredArea,
+                lat: formData.preferredAreaLat,
+                lon: formData.preferredAreaLon
+            }));
 
             navigate(`/event-created/${result.eventCode}`);
         } catch (error) {
             console.error('Error sending meetup data:', error);
             alert('Could not create meetup');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -122,7 +182,7 @@ function CreateMeetup() {
                     </div>
 
                     {/* Form Card */}
-                    <form onSubmit={handleSubmit} className="create-meetup-form">
+                    <form onSubmit={handleSubmit} className="create-meetup-form" noValidate>
 
                         {/* Meetup Name */}
                         <div className="form-section">
@@ -133,18 +193,24 @@ function CreateMeetup() {
                                 placeholder="Sunday Brunch"
                                 value={formData.meetupName}
                                 onChange={handleInputChange}
+                                required
+                                helperText={formError}
                             />
                         </div>
 
                         {/* Preferred Area */}
                         <div className="form-section">
-                            <Input
+                            <AddressInput
+                                ref={locationRef}
                                 label="Preferred Area"
-                                type="text"
                                 name="preferredArea"
                                 placeholder="Downtown, City Center, or pin description"
                                 value={formData.preferredArea || ''}
                                 onChange={handleInputChange}
+                                onSelectSuggestion={handlePreferredAreaSelect}
+                                required
+                                errorText={locationError}
+                                helperText="Start typing and pick a suggested address when possible"
                             />
                         </div>
 
@@ -175,7 +241,13 @@ function CreateMeetup() {
 
                         {/* Action buttons */}
                         <div className="form-actions">
-                            <Button type="submit" variant="primary" size="large" className="btn-cta">
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                size="large"
+                                className="btn-cta"
+                                loading={isSubmitting}
+                            >
                                 Generate Plan
                             </Button>
                         </div>

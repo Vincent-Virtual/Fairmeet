@@ -5,7 +5,7 @@
 Thumbs.db
 
 # ----------------------------
-# Python (backend)
+# Python backend
 # ----------------------------
 __pycache__/
 *.pyc
@@ -15,13 +15,13 @@ __pycache__/
 .venv/
 
 # ----------------------------
-# Node / React (frontend)
+# Node frontend
 # ----------------------------
 Source_code/front_end/node_modules/
 Source_code/front_end/dist/
 
 # ----------------------------
-# IDE / Editor
+# IDE and editor
 # ----------------------------
 .vscode/
 .idea/

@@ -1,13 +1,36 @@
 import math
 import requests
 
+from models import RecommendationItem, RecommendationResult, Venue
+
+
+LOCAL_GEOCODES = {
+    "boston": (42.3601, -71.0589, "Boston, Massachusetts"),
+    "back bay": (42.3503, -71.0810, "Back Bay, Boston, Massachusetts"),
+    "allston": (42.3555, -71.1328, "Allston, Boston, Massachusetts"),
+    "cambridge": (42.3736, -71.1097, "Cambridge, Massachusetts"),
+    "mit": (42.3601, -71.0942, "MIT, Cambridge, Massachusetts"),
+    "harvard": (42.3732, -71.1189, "Harvard Square, Cambridge, Massachusetts"),
+    "brookline": (42.3318, -71.1212, "Brookline, Massachusetts"),
+    "somerville": (42.3876, -71.0995, "Somerville, Massachusetts"),
+    "downtown": (42.3555, -71.0604, "Downtown Boston, Massachusetts"),
+    "boston university": (42.3505, -71.1054, "Boston University, Boston, Massachusetts"),
+    "bu": (42.3505, -71.1054, "Boston University, Boston, Massachusetts"),
+    "northeastern": (42.3398, -71.0892, "Northeastern University, Boston, Massachusetts"),
+    "fenway": (42.3467, -71.0972, "Fenway, Boston, Massachusetts"),
+    "seaport": (42.3519, -71.0475, "Seaport District, Boston, Massachusetts"),
+    "north end": (42.3647, -71.0542, "North End, Boston, Massachusetts"),
+    "south end": (42.3413, -71.0772, "South End, Boston, Massachusetts"),
+    "malden": (42.4251, -71.0662, "Malden, Massachusetts"),
+    "quincy": (42.2529, -71.0023, "Quincy, Massachusetts"),
+}
+
 
 def haversine_miles(lat1, lon1, lat2, lon2):
     if None in (lat1, lon1, lat2, lon2):
         return None
 
-    R = 3958.8  # Earth radius in miles
-
+    radius = 3958.8
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
@@ -15,143 +38,249 @@ def haversine_miles(lat1, lon1, lat2, lon2):
 
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-    return R * c
-
-def build_meetup_summary(meetup):
-    best_place = meetup.get("bestPlace") or meetup.get("mapLocation") or {}
-    participants = meetup.get("participants", [])
-
-    distances = []
-    for p in participants:
-        d = haversine_miles(
-            p.get("lat"),
-            p.get("lon"),
-            best_place.get("lat"),
-            best_place.get("lon")
-        )
-        if d is not None:
-            distances.append(d)
-
-    avg_distance = round(sum(distances) / len(distances), 1) if distances else 0.0
-    max_distance = round(max(distances), 1) if distances else 0.0
-
-    raw_score = 100 - 5 * avg_distance - 2 * max_distance
-    fairness_score = max(0, min(100, round(raw_score)))
-
-    matched_preferences = []
-    if meetup.get("activityType"):
-        matched_preferences.append(meetup["activityType"].capitalize())
-    if meetup.get("indoorOutdoor"):
-        matched_preferences.append(meetup["indoorOutdoor"])
-    if meetup.get("budget"):
-        matched_preferences.append(meetup["budget"])
-
-    explanation = (
-        f"This suggested place balances travel for the current group. "
-        f"The average distance is {avg_distance} miles and the furthest participant "
-        f"travels {max_distance} miles. It aligns with the selected preferences."
-    )
-
-    return {
-        "fairnessScore": fairness_score,
-        "avgDistance": avg_distance,
-        "maxDistance": max_distance,
-        "matchedPreferences": matched_preferences,
-        "explanation": explanation
-    }
+    return radius * c
 
 
 def geocode_location(text):
+    # Local shortcuts make common Boston places fast
     if not text:
         return None, None, None
 
-    query = f"{text}, Massachusetts"
+    cleaned = text.strip().lower()
+    local_matches = []
+    for key, value in LOCAL_GEOCODES.items():
+        if key == cleaned:
+            local_matches.append((0, -len(key), value))
+        elif key in cleaned:
+            local_matches.append((1, -len(key), value))
 
-    try:
-        response = requests.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={
-                "q": query,
-                "format": "jsonv2",
-                "limit": 1
-            },
-            headers={
-                "User-Agent": "FairmeetPrototype/1.0"
-            },
-            timeout=10
-        )
+    if local_matches:
+        local_matches.sort()
+        return local_matches[0][2]
 
-        results = response.json()
+    # Try wider searches when user only types building or street
+    queries = [
+        text,
+        f"{text}, Boston, MA",
+        f"{text}, Massachusetts",
+        f"{text}, United States",
+    ]
 
-        if results:
-            place = results[0]
-            return (
-                float(place["lat"]),
-                float(place["lon"]),
-                place.get("display_name")
+    for query in queries:
+        try:
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "limit": 1,
+                    "countrycodes": "us",
+                },
+                headers={"User-Agent": "FairmeetPrototype/1.0"},
+                timeout=8,
             )
-
-    except Exception as e:
-        print("Geocode error:", e)
+            response.raise_for_status()
+            results = response.json()
+            if results:
+                place = results[0]
+                return float(place["lat"]), float(place["lon"]), place.get("display_name")
+        except Exception:
+            continue
 
     return None, None, None
 
-def compute_best_place(meetup):
+
+def geocode_suggestions(text, limit=5):
+    if not text or len(text.strip()) < 3:
+        return []
+
+    cleaned = text.strip().lower()
+    local_matches = []
+    for key, value in LOCAL_GEOCODES.items():
+        if cleaned in key or key in cleaned:
+            score = 2
+            if key == cleaned:
+                score = 0
+            elif key.startswith(cleaned) or cleaned.startswith(key):
+                score = 1
+            local_matches.append({
+                "label": value[2],
+                "lat": value[0],
+                "lon": value[1],
+                "score": score,
+                "source": "local",
+            })
+    local_matches.sort(key=lambda item: (item["score"], len(item["label"])))
+
+    # Local first, then live map suggestions
+    queries = [
+        text,
+        f"{text}, Boston, MA",
+        f"{text}, Massachusetts",
+        f"{text}, United States",
+    ]
+
+    try:
+        remote_matches = []
+        for query in queries:
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "addressdetails": 1,
+                    "limit": limit,
+                    "countrycodes": "us",
+                },
+                headers={"User-Agent": "FairmeetPrototype/1.0"},
+                timeout=8,
+            )
+            response.raise_for_status()
+            for place in response.json():
+                remote_matches.append({
+                    "label": place.get("display_name"),
+                    "lat": float(place["lat"]),
+                    "lon": float(place["lon"]),
+                    "score": 3,
+                    "source": "nominatim",
+                })
+
+        seen = set()
+        suggestions = []
+        for item in local_matches + remote_matches:
+            if not item["label"] or item["label"] in seen:
+                continue
+            seen.add(item["label"])
+            item.pop("score", None)
+            suggestions.append(item)
+        return suggestions[:limit]
+    except Exception as exc:
+        for item in local_matches:
+            item.pop("score", None)
+        return local_matches[:limit]
+
+
+def compute_center(meetup, participants):
+    # Start with preferred area and average in participant points
     points = []
 
-    # preferred area pulls center slightly
-    if meetup.get("preferredAreaLat"):
-        points.append((
-            meetup["preferredAreaLat"],
-            meetup["preferredAreaLon"]
-        ))
+    if meetup.preferred_lat is not None and meetup.preferred_lon is not None:
+        points.append((meetup.preferred_lat, meetup.preferred_lon))
 
-    for p in meetup["participants"]:
-        points.append((p["lat"], p["lon"]))
+    for participant in participants:
+        if participant.latitude is not None and participant.longitude is not None:
+            points.append((participant.latitude, participant.longitude))
 
     if not points:
-        return None
+        return 42.3601, -71.0589
 
-    avg_lat = sum(p[0] for p in points) / len(points)
-    avg_lon = sum(p[1] for p in points) / len(points)
+    lat = sum(point[0] for point in points) / len(points)
+    lon = sum(point[1] for point in points) / len(points)
+    return lat, lon
 
-    print("new best place", (avg_lat, avg_lon))
-    return {
-        "name": "Suggested Meetup Center",
-        "lat": avg_lat,
-        "lon": avg_lon
-    }
 
 def get_overpass_filters(activity_type):
     activity = (activity_type or "").strip().lower()
-
     mapping = {
-        "coffee": [('amenity', 'cafe')],
-        "food": [('amenity', 'restaurant')],
-        "drinks": [('amenity', 'bar'), ('amenity', 'pub')],
-        "study": [('amenity', 'cafe'), ('amenity', 'library')],
-        "entertainment": [('amenity', 'cinema')]
+        "coffee": [("amenity", "cafe")],
+        "food": [("amenity", "restaurant")],
+        "drinks": [("amenity", "bar"), ("amenity", "pub")],
+        "study": [("amenity", "library"), ("amenity", "cafe")],
+        "entertainment": [("amenity", "cinema")],
     }
+    return mapping.get(activity, [("amenity", "cafe"), ("amenity", "restaurant")])
 
-    return mapping.get(activity, [('amenity', 'cafe')])
 
-def search_real_venues(lat, lon, activity_type, radius_m=1500):
+def category_for_tags(tags):
+    if tags.get("amenity") == "cafe":
+        return "cafe"
+    if tags.get("amenity") == "restaurant":
+        return "restaurant"
+    if tags.get("amenity") in ("bar", "pub"):
+        return "bar"
+    if tags.get("amenity") == "library":
+        return "library"
+    if tags.get("amenity") == "cinema":
+        return "cinema"
+    return tags.get("amenity") or "place"
+
+
+def sample_venues(activity_type, lat, lon):
+    # Fallback venues so app still works offline
+    activity = (activity_type or "coffee").lower()
+    templates = {
+        "coffee": [
+            ("Central Cafe", "cafe", "$"),
+            ("Study Grounds", "cafe", "$$"),
+            ("Common Coffee", "cafe", "$"),
+            ("Corner Espresso", "cafe", "$$"),
+            ("Harbor Cafe", "cafe", "$$"),
+        ],
+        "food": [
+            ("Fair Table Restaurant", "restaurant", "$$"),
+            ("Neighborhood Kitchen", "restaurant", "$"),
+            ("Market Hall", "restaurant", "$$"),
+            ("Central Noodle", "restaurant", "$"),
+            ("Green Bowl", "restaurant", "$$"),
+        ],
+        "drinks": [
+            ("Meetup Pub", "bar", "$$"),
+            ("Evening Tap", "pub", "$$"),
+            ("Common Bar", "bar", "$"),
+            ("Union Lounge", "bar", "$$$"),
+            ("Quiet Pour", "pub", "$$"),
+        ],
+        "study": [
+            ("Community Library", "library", "$"),
+            ("Quiet Cafe", "cafe", "$"),
+            ("Reading Room", "library", "$"),
+            ("Study Grounds", "cafe", "$$"),
+            ("Learning Commons", "library", "$"),
+        ],
+        "entertainment": [
+            ("Central Cinema", "cinema", "$$"),
+            ("Arts Theater", "theatre", "$$"),
+            ("Music Hall", "entertainment", "$$"),
+            ("Game Lounge", "entertainment", "$"),
+            ("Gallery Night", "entertainment", "$$"),
+        ],
+    }
+    rows = templates.get(activity, templates["coffee"])
+    offsets = [(0.002, 0.002), (-0.002, 0.001), (0.001, -0.002), (-0.0015, -0.001), (0.0025, -0.0015)]
+
+    venues = []
+    for index, row in enumerate(rows):
+        off = offsets[index % len(offsets)]
+        venues.append(
+            Venue(
+                name=row[0],
+                address="Greater Boston area",
+                latitude=lat + off[0],
+                longitude=lon + off[1],
+                category=row[1],
+                price_level=row[2],
+                source="sample",
+            )
+        )
+    return venues
+
+
+def search_real_venues(lat, lon, activity_type, radius_m=1600):
     if lat is None or lon is None:
-        return []
+        lat, lon = 42.3601, -71.0589
 
+    # Overpass uses map tags, build query from activity
     filters = get_overpass_filters(activity_type)
-
-    query_parts = []
+    parts = []
     for key, value in filters:
-        query_parts.append(f'node(around:{radius_m},{lat},{lon})["{key}"="{value}"];')
-        query_parts.append(f'way(around:{radius_m},{lat},{lon})["{key}"="{value}"];')
-        query_parts.append(f'relation(around:{radius_m},{lat},{lon})["{key}"="{value}"];')
+        parts.append(f'node(around:{radius_m},{lat},{lon})["{key}"="{value}"];')
+        parts.append(f'way(around:{radius_m},{lat},{lon})["{key}"="{value}"];')
+        parts.append(f'relation(around:{radius_m},{lat},{lon})["{key}"="{value}"];')
 
-    overpass_query = f"""
+    query = f"""
     [out:json][timeout:20];
     (
-      {"".join(query_parts)}
+      {"".join(parts)}
     );
     out center;
     """
@@ -159,94 +288,165 @@ def search_real_venues(lat, lon, activity_type, radius_m=1500):
     try:
         response = requests.get(
             "https://overpass-api.de/api/interpreter",
-            params={"data": overpass_query},
+            params={"data": query},
             headers={"User-Agent": "FairmeetPrototype/1.0"},
-            timeout=20
+            timeout=15,
         )
         response.raise_for_status()
         data = response.json()
 
         venues = []
-        for el in data.get("elements", []):
-            tags = el.get("tags", {})
+        seen = set()
+        for element in data.get("elements", []):
+            tags = element.get("tags", {})
             name = tags.get("name")
             if not name:
                 continue
 
-            venue_lat = el.get("lat")
-            venue_lon = el.get("lon")
-
+            venue_lat = element.get("lat")
+            venue_lon = element.get("lon")
             if venue_lat is None or venue_lon is None:
-                center = el.get("center", {})
+                center = element.get("center", {})
                 venue_lat = center.get("lat")
                 venue_lon = center.get("lon")
-
             if venue_lat is None or venue_lon is None:
                 continue
+
+            key = (name.lower(), round(float(venue_lat), 5), round(float(venue_lon), 5))
+            if key in seen:
+                continue
+            seen.add(key)
 
             address_parts = [
                 tags.get("addr:housenumber"),
                 tags.get("addr:street"),
-                tags.get("addr:city")
+                tags.get("addr:city"),
             ]
-            address = ", ".join([p for p in address_parts if p]) or tags.get("addr:full") or ""
+            address = ", ".join(part for part in address_parts if part) or tags.get("addr:full") or ""
 
-            venues.append({
-                "name": name,
-                "lat": venue_lat,
-                "lon": venue_lon,
-                "address": address,
-                "source": "overpass"
-            })
+            venues.append(
+                Venue(
+                    name=name,
+                    address=address,
+                    latitude=float(venue_lat),
+                    longitude=float(venue_lon),
+                    category=category_for_tags(tags),
+                    price_level=tags.get("price") or tags.get("price_level") or "",
+                    source="overpass",
+                )
+            )
+
+            if len(venues) >= 12:
+                break
+
+        if len(venues) < 5:
+            venues.extend(sample_venues(activity_type, lat, lon))
 
         return venues
+    except Exception as exc:
+        print("Overpass venue search failed:", exc)
 
-    except Exception as e:
-        print("Overpass venue search failed:", str(e))
-        return []
+    return sample_venues(activity_type, lat, lon)
 
-def choose_best_venue(meetup, venues, fallback_center):
-    if not venues:
-        return fallback_center
 
-    participants = meetup.get("participants", [])
-    best_venue = None
-    best_score = float("inf")
+class RecommendationEngine:
+    def __init__(self, fairness_weight=0.7, preference_weight=0.3):
+        self.fairness_weight = fairness_weight
+        self.preference_weight = preference_weight
 
-    for venue in venues:
+    def generateRecommendations(self, meetup, participants, venues):
+        # Score candidates and keep the few UI shows
+        if not venues:
+            lat, lon = compute_center(meetup, participants)
+            venues = sample_venues(meetup.activity_type, lat, lon)
+
+        items = []
+        for venue in venues:
+            distance_score, avg_distance, max_distance = self.computeDistanceScore(participants, venue, meetup)
+            preference_score, matched = self.computePreferenceScore(meetup, participants, venue)
+            final_score = self.computeFinalScore(distance_score, preference_score)
+            reason = (
+                f"This venue has an average travel distance of {avg_distance:.1f} miles "
+                f"and the farthest participant travels {max_distance:.1f} miles."
+            )
+            if matched:
+                reason += " It matches " + ", ".join(matched) + "."
+
+            items.append(
+                RecommendationItem(
+                    venue=venue,
+                    final_score=final_score,
+                    avg_distance=avg_distance,
+                    max_distance=max_distance,
+                    matched_preferences=matched,
+                    reason_text=reason,
+                )
+            )
+
+        items.sort(key=lambda item: item.final_score, reverse=True)
+        for index, item in enumerate(items[:5], start=1):
+            item.rank_no = index
+
+        return RecommendationResult(meetup_id=meetup.meetup_id, ranked_venues=items[:5])
+
+    def computeDistanceScore(self, participants, venue, meetup=None):
+        # Shorter and even travel gets better score
         distances = []
-
-        for p in participants:
-            if p.get("lat") is None or p.get("lon") is None:
-                continue
-
-            d = haversine_miles(
-                p["lat"],
-                p["lon"],
-                venue["lat"],
-                venue["lon"]
+        for participant in participants:
+            distance = haversine_miles(
+                participant.latitude,
+                participant.longitude,
+                venue.latitude,
+                venue.longitude,
             )
-            if d is not None:
-                distances.append(d)
+            if distance is not None:
+                distances.append(distance)
 
-        total_distance = sum(distances) if distances else 0.0
-        max_distance = max(distances) if distances else 0.0
-
-        # small penalty if venue is far from preferred area
-        preferred_penalty = 0.0
-        if meetup.get("preferredAreaLat") is not None and meetup.get("preferredAreaLon") is not None:
-            d_pref = haversine_miles(
-                meetup["preferredAreaLat"],
-                meetup["preferredAreaLon"],
-                venue["lat"],
-                venue["lon"]
+        if not distances and meetup:
+            distance = haversine_miles(
+                meetup.preferred_lat,
+                meetup.preferred_lon,
+                venue.latitude,
+                venue.longitude,
             )
-            preferred_penalty = d_pref or 0.0
+            if distance is not None:
+                distances.append(distance)
 
-        score = total_distance + 1.5 * max_distance + 0.3 * preferred_penalty
+        if not distances:
+            return 60.0, 0.0, 0.0
 
-        if score < best_score:
-            best_score = score
-            best_venue = venue
+        avg_distance = sum(distances) / len(distances)
+        max_distance = max(distances)
+        score = 100 - 5 * avg_distance - 2 * max_distance
+        return max(0, min(100, score)), avg_distance, max_distance
 
-    return best_venue or fallback_center
+    def computePreferenceScore(self, meetup, participants, venue):
+        # Simple preference score for now, mostly activity and budget
+        matched = []
+        score = 40.0
+
+        budget = meetup.budget_level or ""
+        activity = meetup.activity_type or ""
+
+        participant_budgets = [p.budget_preference for p in participants if p.budget_preference]
+        if not budget and participant_budgets:
+            budget = participant_budgets[0]
+
+        if venue.matchesActivity(activity):
+            score += 35
+            if activity:
+                matched.append(activity.capitalize())
+
+        if venue.matchesBudget(budget):
+            score += 20
+            if budget:
+                matched.append(budget)
+
+        if meetup.indoor_outdoor and meetup.indoor_outdoor != "Any":
+            matched.append(meetup.indoor_outdoor)
+            score += 5
+
+        return max(0, min(100, score)), matched
+
+    def computeFinalScore(self, distance_score, preference_score):
+        return distance_score * self.fairness_weight + preference_score * self.preference_weight
