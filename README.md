@@ -1,3 +1,5 @@
+> Branch note: `merge/backend-muhua` is used to merge `feature/backend-muhua` back into the project and avoid a large amount of conflicts going straight into main.
+
 # FairMeet
 
 FairMeet is a web application that helps a group find a fair meetup location. It uses participant locations, activity preferences, and budget choices to recommend nearby venues.
