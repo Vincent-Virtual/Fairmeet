@@ -37,10 +37,9 @@
 .results-title {
     font-size: var(--text-4xl);
     font-weight: var(--font-extrabold);
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-text-primary);
+    background: none;
+    -webkit-text-fill-color: currentColor;
     margin-bottom: var(--spacing-2);
     line-height: var(--leading-tight);
 }
@@ -110,11 +109,10 @@
     background: linear-gradient(135deg, rgba(107, 142, 247, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
     border: 2px dashed rgba(139, 92, 246, 0.3);
     border-radius: var(--radius-xl);
-    display: flex;
-    align-items: center;
-    justify-content: center;
     margin-bottom: var(--spacing-4);
     transition: all var(--transition-base);
+    overflow: hidden;
+    position: relative;
 }
 
 .map-placeholder:hover {
@@ -123,6 +121,11 @@
 }
 
 .map-placeholder-content {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
     text-align: center;
 }
 
@@ -163,6 +166,7 @@
 
 .legend-items {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-6);
 }
 
@@ -183,11 +187,115 @@
 }
 
 .participant-color {
-    background: var(--gradient-primary);
+    background: var(--color-success);
+    border-radius: 50% 50% 45% 45%;
+}
+
+.selected-participant-color {
+    background: var(--color-primary-500);
+    border-radius: 50% 50% 45% 45%;
 }
 
 .venue-color {
-    background-color: var(--color-gray-400);
+    background-color: var(--color-warning, #f59e0b);
+}
+
+.venue-map-marker {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #f59e0b;
+    color: var(--color-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-bold);
+    border: 3px solid var(--color-white);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+    transition: all var(--transition-base);
+}
+
+.venue-map-marker-selected {
+    background: var(--color-primary-600);
+    transform: scale(1.18);
+    box-shadow: 0 4px 14px rgba(91, 141, 239, 0.45);
+}
+
+.self-map-marker {
+    position: relative;
+    width: 32px;
+    height: 34px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
+}
+
+.self-map-marker::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 9px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-success);
+    border: 3px solid var(--color-white);
+}
+
+.self-map-marker::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 5px;
+    width: 22px;
+    height: 18px;
+    border-radius: 12px 12px 8px 8px;
+    background: var(--color-success);
+    border: 3px solid var(--color-white);
+}
+
+.selected-participant-map-marker {
+    position: relative;
+    width: 32px;
+    height: 34px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
+}
+
+.selected-participant-map-marker::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 9px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary-500);
+    border: 3px solid var(--color-white);
+}
+
+.selected-participant-map-marker::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 5px;
+    width: 22px;
+    height: 18px;
+    border-radius: 12px 12px 8px 8px;
+    background: var(--color-primary-500);
+    border: 3px solid var(--color-white);
+}
+
+.map-popup-button {
+    margin-top: var(--spacing-2);
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-500);
+    color: var(--color-white);
+    padding: var(--spacing-2) var(--spacing-3);
+    cursor: pointer;
+    font-weight: var(--font-semibold);
+}
+
+.map-popup-button:hover {
+    background: var(--color-primary-600);
 }
 
 /* ========================================
@@ -369,8 +477,8 @@
 .btn-icon-inline {
     width: 20px;
     height: 20px;
-    margin-right: var(--spacing-2);
     stroke-width: 2;
+    flex: 0 0 auto;
 }
 
 .action-btn {

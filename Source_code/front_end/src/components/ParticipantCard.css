@@ -13,17 +13,35 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-4);
+    width: 100%;
     padding: var(--spacing-5);
     background-color: var(--color-white);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
     transition: all var(--transition-base);
+    text-align: left;
+    font: inherit;
+    color: inherit;
 }
 
 .participant-card:hover {
     box-shadow: var(--shadow-md);
     border-color: rgba(91, 141, 239, 0.3);
     transform: translateY(-2px);
+}
+
+.participant-card-clickable {
+    cursor: pointer;
+}
+
+.participant-card-selected {
+    border-color: var(--color-primary-500);
+    background-color: var(--color-primary-50);
+    box-shadow: var(--shadow-primary);
+}
+
+.participant-card-selected .participant-avatar {
+    background: var(--color-primary-600);
 }
 
 /* ========================================

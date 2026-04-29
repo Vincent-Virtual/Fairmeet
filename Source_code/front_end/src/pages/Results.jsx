@@ -1,5 +1,5 @@
 // src/pages/Results.jsx
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     MapIcon,
@@ -13,18 +13,79 @@ import ParticipantCard from '../components/ParticipantCard';
 import Button from '../components/ui/Button';
 import './Results.css';
 
-import { useLocation } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 import L from 'leaflet';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-L.Marker.prototype.options.icon = L.icon({
-    iconUrl: markerIcon,
-    shadowUrl: markerShadow,
+const defaultCenter = [42.3601, -71.0589];
+
+function venueIcon(rank, selected) {
+    return L.divIcon({
+        className: '',
+        html: `<div class="venue-map-marker ${selected ? 'venue-map-marker-selected' : ''}">${rank}</div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        popupAnchor: [0, -18]
+    });
+}
+
+const participantIcon = L.divIcon({
+    className: '',
+    html: '<div class="self-map-marker"><span></span></div>',
+    iconSize: [32, 34],
+    iconAnchor: [16, 30],
+    popupAnchor: [0, -26]
 });
+
+const selectedParticipantIcon = L.divIcon({
+    className: '',
+    html: '<div class="selected-participant-map-marker"><span></span></div>',
+    iconSize: [32, 34],
+    iconAnchor: [16, 30],
+    popupAnchor: [0, -26]
+});
+
+function MapController({ points, selectedVenue, selectedParticipant }) {
+    const map = useMap();
+    const didFit = useRef(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => map.invalidateSize(), 80);
+        return () => clearTimeout(timer);
+    }, [map]);
+
+    useEffect(() => {
+        const validPoints = points.filter((point) => point.lat != null && point.lon != null);
+        if (!didFit.current && validPoints.length > 0) {
+            if (validPoints.length === 1) {
+                map.setView([validPoints[0].lat, validPoints[0].lon], 14);
+            } else {
+                const bounds = L.latLngBounds(validPoints.map((point) => [point.lat, point.lon]));
+                map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 });
+            }
+            didFit.current = true;
+        }
+    }, [map, points]);
+
+    useEffect(() => {
+        if (selectedVenue?.lat != null && selectedVenue?.lon != null) {
+            map.flyTo([selectedVenue.lat, selectedVenue.lon], Math.max(map.getZoom(), 14), {
+                duration: 0.4
+            });
+        }
+    }, [map, selectedVenue?.rank, selectedVenue?.lat, selectedVenue?.lon]);
+
+    useEffect(() => {
+        if (selectedParticipant?.lat != null && selectedParticipant?.lon != null) {
+            map.flyTo([selectedParticipant.lat, selectedParticipant.lon], Math.max(map.getZoom(), 14), {
+                duration: 0.4
+            });
+        }
+    }, [map, selectedParticipant?.id, selectedParticipant?.lat, selectedParticipant?.lon]);
+
+    return null;
+}
 
 function Results() {
     const { eventCode } = useParams();
@@ -32,70 +93,15 @@ function Results() {
 
     const [meetupData, setMeetupData] = useState(null);
     const [showAllVenues, setShowAllVenues] = useState(false);
-
-    // Mock venue data
-    const mockVenues = [
-        {
-            rank: 1,
-            name: "Central Cafe & Bistro",
-            address: "456 Main Street, Downtown",
-            fairnessScore: 92,
-            avgDistance: 4.2,
-            maxDistance: 6.8,
-            matchedPreferences: ["Restaurant", "Indoor", "$$"],
-            explanation: "This location minimizes the maximum distance any participant needs to travel (6.8 miles), while keeping the average distance at 4.2 miles. It matches all specified activity preferences and budget constraints.",
-            coordinates: { lat: 40.7589, lng: -73.9851 }
-        },
-        {
-            rank: 2,
-            name: "Harmony Coffee House",
-            address: "789 Oak Avenue, Midtown",
-            fairnessScore: 88,
-            avgDistance: 4.5,
-            maxDistance: 7.2,
-            matchedPreferences: ["Cafe", "Indoor", "$"],
-            explanation: "This location minimizes the maximum distance any participant needs to travel (7.2 miles), while keeping the average distance at 4.5 miles. It matches all specified activity preferences and budget constraints.",
-            coordinates: { lat: 40.7549, lng: -73.9840 }
-        },
-        {
-            rank: 3,
-            name: "The Meeting Spot",
-            address: "321 Elm Street, Central District",
-            fairnessScore: 85,
-            avgDistance: 4.8,
-            maxDistance: 7.5,
-            matchedPreferences: ["Restaurant", "Indoor/Outdoor", "$$"],
-            explanation: "This location minimizes the maximum distance any participant needs to travel (7.5 miles), while keeping the average distance at 4.8 miles. It matches all specified activity preferences and budget constraints.",
-            coordinates: { lat: 40.7580, lng: -73.9855 }
-        }
-    ];
-
+    const [selectedRank, setSelectedRank] = useState(null);
+    const [selectedParticipantId, setSelectedParticipantId] = useState(null);
+    const [activePopupRank, setActivePopupRank] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [recalculating, setRecalculating] = useState(false);
     const [error, setError] = useState('');
-    // useEffect(() => {
-    //     const data = localStorage.getItem(`meetup_${eventCode}`);
-    //     if (data) {
-    //         setMeetupData(JSON.parse(data));
-    //     }
-    // }, [eventCode]);
-    // useEffect(() => {
-    //     const fetchMeetup = async () => {
-    //         try {
-    //             const response = await fetch(`/api/meetup/${eventCode}`);
-    //             const data = await response.json();
+    const markerRefs = useRef({});
+    const participantMarkerRef = useRef(null);
 
-    //             if (!response.ok) {
-    //                 throw new Error(data.error || "Failed to fetch meetup");
-    //             }
-
-    //             setMeetupData(data);
-    //         } catch (err) {
-    //             console.error("Failed to load meetup:", err);
-    //         }
-    //     };
-
-    //     fetchMeetup();
-    // }, [eventCode]);
     useEffect(() => {
         const fetchMeetup = async () => {
             try {
@@ -103,14 +109,14 @@ function Results() {
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || "Failed to fetch meetup");
+                    throw new Error(data.error || 'Failed to fetch meetup');
                 }
 
                 setMeetupData(data);
                 setError('');
             } catch (err) {
-                console.error("Failed to load meetup:", err);
-                setError(err.message || "Failed to load meetup");
+                console.error('Failed to load meetup:', err);
+                setError(err.message || 'Failed to load meetup');
             } finally {
                 setLoading(false);
             }
@@ -123,18 +129,160 @@ function Results() {
         return () => clearInterval(interval);
     }, [eventCode]);
 
-    
-
-    // const mapLocation = meetupData?.mapLocation;
-    const mapLocation = meetupData?.bestPlace || meetupData?.mapLocation;
     const participants = meetupData?.participants || [];
     const summary = meetupData?.summary;
+    const recommendations = meetupData?.recommendations || meetupData?.result?.items || [];
+    const venuesToDisplay = showAllVenues ? recommendations : recommendations.slice(0, 3);
+    const ownerLocationText = sessionStorage.getItem(`fairmeet_owner_location_${eventCode}`);
+    const ownerLocation = ownerLocationText ? JSON.parse(ownerLocationText) : null;
+    const participantKey = (participant) => String(
+        participant?.id || participant?.participantId || `${participant?.name || 'participant'}-${participant?.lat || ''}-${participant?.lon || ''}`
+    );
+    const hasCreatorParticipant = participants.some((participant) => participant.role === 'creator');
+    const visibleParticipants = !hasCreatorParticipant && ownerLocation
+        ? [{
+            id: 'local-creator',
+            participantId: 'local-creator',
+            name: 'Creator',
+            role: 'creator',
+            location: ownerLocation.label,
+            locationName: ownerLocation.label,
+            lat: ownerLocation.lat,
+            lon: ownerLocation.lon
+        }, ...participants]
+        : participants;
 
-    const venueName = mapLocation?.name || 'Suggested Meetup Center';
-    const venueAddress = meetupData?.preferredArea || 'Near the current group center';
+    useEffect(() => {
+        if (recommendations.length === 0) {
+            setSelectedRank(null);
+            return;
+        }
 
-    const handleRecalculate = () => {
-        alert('Recalculate feature - will trigger backend recalculation');
+        const stillExists = recommendations.some((venue) => venue.rank === selectedRank);
+        if (!stillExists) {
+            setSelectedRank(recommendations[0].rank);
+        }
+    }, [recommendations, selectedRank]);
+
+    useEffect(() => {
+        if (selectedParticipantId && !visibleParticipants.some((participant) => participantKey(participant) === selectedParticipantId)) {
+            setSelectedParticipantId(null);
+        }
+    }, [visibleParticipants, selectedParticipantId]);
+
+    const selectedVenue = recommendations.find((venue) => venue.rank === selectedRank) || recommendations[0];
+    const selectedParticipant = visibleParticipants.find((participant) => participantKey(participant) === selectedParticipantId);
+    const selectedParticipantLocation = selectedParticipant?.lat != null && selectedParticipant?.lon != null
+        ? {
+            id: participantKey(selectedParticipant),
+            lat: selectedParticipant.lat,
+            lon: selectedParticipant.lon,
+            name: selectedParticipant.name || 'Participant',
+            label: selectedParticipant.location || selectedParticipant.locationName || 'Selected location'
+        }
+        : null;
+    const viewerParticipantId = sessionStorage.getItem(`fairmeet_participant_${eventCode}`);
+    const viewerParticipant = participants.find((participant) => String(participant.id) === String(viewerParticipantId));
+    const viewerLocation = viewerParticipant?.lat != null && viewerParticipant?.lon != null
+        ? {
+            lat: viewerParticipant.lat,
+            lon: viewerParticipant.lon,
+            label: viewerParticipant.location || viewerParticipant.locationName || 'Your location'
+        }
+        : ownerLocation;
+    const mapCenter = selectedVenue?.lat != null && selectedVenue?.lon != null
+        ? [selectedVenue.lat, selectedVenue.lon]
+        : defaultCenter;
+
+    const mapPoints = [
+        ...recommendations.map((venue) => ({ lat: venue.lat, lon: venue.lon })),
+        ...(viewerLocation ? [{ lat: viewerLocation.lat, lon: viewerLocation.lon }] : []),
+        ...(selectedParticipantLocation ? [{ lat: selectedParticipantLocation.lat, lon: selectedParticipantLocation.lon }] : [])
+    ];
+    const hasMapPoints = mapPoints.some((point) => point.lat != null && point.lon != null);
+
+    const openGoogleMaps = (venue) => {
+        if (venue?.lat == null || venue?.lon == null) return;
+
+        const params = new URLSearchParams({
+            api: '1',
+            destination: `${venue.lat},${venue.lon}`,
+            travelmode: 'driving'
+        });
+
+        if (viewerLocation?.lat != null && viewerLocation?.lon != null) {
+            params.set('origin', `${viewerLocation.lat},${viewerLocation.lon}`);
+        }
+
+        window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const selectVenue = (venue, options = {}) => {
+        const { shouldScroll = false, fromMap = false } = options;
+        setSelectedRank(venue.rank);
+        if (venue.rank > 3) {
+            setShowAllVenues(true);
+        }
+
+        if (!fromMap && activePopupRank != null) {
+            setTimeout(() => {
+                markerRefs.current[venue.rank]?.openPopup();
+            }, 120);
+        }
+
+        if (shouldScroll) {
+            setTimeout(() => {
+                document.getElementById(`venue-card-${venue.rank}`)?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }, 80);
+        }
+    };
+
+    const selectParticipant = (participant) => {
+        const key = participantKey(participant);
+        if (selectedParticipantId === key) {
+            setSelectedParticipantId(null);
+            participantMarkerRef.current?.closePopup();
+            return;
+        }
+
+        setSelectedParticipantId(key);
+        setTimeout(() => {
+            participantMarkerRef.current?.openPopup();
+        }, 150);
+    };
+
+    const handleRecalculate = async () => {
+        try {
+            setRecalculating(true);
+            const response = await fetch('/api/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventCode })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to recalculate');
+            }
+
+            const meetupResponse = await fetch(`/api/meetup/${eventCode}`);
+            const meetup = await meetupResponse.json();
+
+            if (!meetupResponse.ok) {
+                throw new Error(meetup.error || 'Failed to load meetup');
+            }
+
+            setMeetupData(meetup);
+            setSelectedRank(meetup.recommendations?.[0]?.rank || null);
+            setError('');
+        } catch (err) {
+            setError(err.message || 'Failed to recalculate');
+        } finally {
+            setRecalculating(false);
+        }
     };
 
     const handleShareResults = () => {
@@ -147,75 +295,117 @@ function Results() {
         navigate('/');
     };
 
-    const venuesToDisplay = showAllVenues ? mockVenues : mockVenues.slice(0, 3);
-
     return (
         <div className="results-page">
             <Header />
 
             <main className="results-main">
                 <div className="results-container">
-
-                    {/* Page header */}
                     <div className="results-header">
-                        <h1 className="results-title">Recommended Venues</h1>
+                        <h1 className="results-title">
+                            {meetupData?.meetupName ? `${meetupData.meetupName} Results` : 'Recommended Venues'}
+                        </h1>
                         <p className="results-subtitle">
-                            Based on fairness calculation for all {meetupData?.participants?.length || 0} participants
+                            Recommended venues based on {meetupData?.activityType || 'meetup'} preferences and {visibleParticipants.length} participants
                         </p>
                     </div>
 
-                    {/* Main content grid: Map (left) + Venues (right) */}
                     <div className="results-grid">
-
-                        {/* Left column - Map section */}
                         <div className="map-section">
                             <div className="map-header">
                                 <MapIcon className="map-header-icon" />
                                 <span className="map-title">Map View</span>
                             </div>
 
-                            <div className="map-placeholder" style={{ height: "320px" }}>
-                                {mapLocation && mapLocation.lat && mapLocation.lon ? (
+                            <div className="map-placeholder">
+                                {hasMapPoints ? (
                                     <MapContainer
-                                        key={`${mapLocation.lat}-${mapLocation.lon}`}
-                                        center={[mapLocation.lat, mapLocation.lon]}
+                                        center={mapCenter}
                                         zoom={13}
-                                        scrollWheelZoom={false}
-                                        style={{ height: "100%", width: "100%" }}
+                                        scrollWheelZoom={true}
+                                        style={{ height: '100%', width: '100%' }}
                                     >
+                                        <MapController
+                                            points={mapPoints}
+                                            selectedVenue={selectedVenue}
+                                            selectedParticipant={selectedParticipantLocation}
+                                        />
                                         <TileLayer
                                             attribution="&copy; OpenStreetMap contributors"
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         />
 
-                                        {/* Best place marker */}
-                                        <Marker position={[mapLocation.lat, mapLocation.lon]}>
-                                            <Popup>
-                                                {mapLocation.name || "Suggested Meetup Place"}
-                                            </Popup>
-                                        </Marker>
-
-                                        {/* Participant markers */}
-                                        {participants.map((participant, index) => (
-                                            participant.lat != null && participant.lon != null ? (
+                                        {recommendations.map((venue) => (
+                                            venue.lat != null && venue.lon != null ? (
                                                 <Marker
-                                                    key={participant.id || `${participant.name}-${index}`}
-                                                    position={[participant.lat, participant.lon]}
+                                                    key={venue.itemId || `${venue.rank}-${venue.name}`}
+                                                    ref={(ref) => {
+                                                        if (ref) {
+                                                            markerRefs.current[venue.rank] = ref;
+                                                        } else {
+                                                            delete markerRefs.current[venue.rank];
+                                                        }
+                                                    }}
+                                                    position={[venue.lat, venue.lon]}
+                                                    icon={venueIcon(venue.rank, venue.rank === selectedRank)}
+                                                    eventHandlers={{
+                                                        click: () => selectVenue(venue, { shouldScroll: true, fromMap: true }),
+                                                        popupopen: () => setActivePopupRank(venue.rank),
+                                                        popupclose: () => {
+                                                            setActivePopupRank((current) => current === venue.rank ? null : current);
+                                                        }
+                                                    }}
                                                 >
                                                     <Popup>
-                                                        <strong>{participant.name || 'Participant'}</strong>
+                                                        <strong>{venue.name}</strong>
                                                         <br />
-                                                        {participant.location || participant.locationName || 'Unknown location'}
+                                                        {venue.address || 'Greater Boston area'}
+                                                        <br />
+                                                        <button
+                                                            type="button"
+                                                            className="map-popup-button"
+                                                            onClick={() => openGoogleMaps(venue)}
+                                                        >
+                                                            Open in Google Maps
+                                                        </button>
                                                     </Popup>
                                                 </Marker>
                                             ) : null
                                         ))}
+
+                                        {viewerLocation?.lat != null && viewerLocation?.lon != null && (
+                                            <Marker
+                                                position={[viewerLocation.lat, viewerLocation.lon]}
+                                                icon={participantIcon}
+                                            >
+                                                <Popup>
+                                                    <strong>Your location</strong>
+                                                    <br />
+                                                    {viewerLocation.label || 'Selected location'}
+                                                </Popup>
+                                            </Marker>
+                                        )}
+
+                                        {selectedParticipantLocation && (
+                                            <Marker
+                                                key={selectedParticipantLocation.id}
+                                                ref={participantMarkerRef}
+                                                position={[selectedParticipantLocation.lat, selectedParticipantLocation.lon]}
+                                                icon={selectedParticipantIcon}
+                                            >
+                                                <Popup>
+                                                    <strong>{selectedParticipantLocation.name}</strong>
+                                                    <br />
+                                                    {selectedParticipantLocation.label}
+                                                </Popup>
+                                            </Marker>
+                                        )}
                                     </MapContainer>
                                 ) : (
                                     <div className="map-placeholder-content">
                                         <MapIcon className="map-placeholder-icon" />
                                         <p className="map-placeholder-text">
-                                            {loading ? "Loading map..." : "No location selected"}
+                                            {loading ? 'Loading map...' : 'No recommendation locations yet'}
                                         </p>
                                         {error && (
                                             <p className="map-placeholder-subtext">{error}</p>
@@ -224,34 +414,56 @@ function Results() {
                                 )}
                             </div>
 
-                            {/* Legend */}
                             <div className="map-legend">
                                 <h4 className="legend-title">Legend</h4>
                                 <div className="legend-items">
                                     <div className="legend-item">
-                                        <div className="legend-color participant-color"></div>
-                                        <span>Participants</span>
+                                        <div className="legend-color venue-color"></div>
+                                        <span>Recommended venues</span>
                                     </div>
                                     <div className="legend-item">
-                                        <div className="legend-color venue-color"></div>
-                                        <span>Venues</span>
+                                        <div className="legend-color participant-color"></div>
+                                        <span>Your location</span>
                                     </div>
+                                    {selectedParticipantLocation && (
+                                        <div className="legend-item">
+                                            <div className="legend-color selected-participant-color"></div>
+                                            <span>Selected participant</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right column - Venues list */}
                         <div className="venues-section">
-                            {summary ? (
+                            {venuesToDisplay.length > 0 ? (
+                                venuesToDisplay.map((venue) => (
+                                    <VenueCard
+                                        key={venue.itemId || `${venue.rank}-${venue.name}`}
+                                        rank={venue.rank}
+                                        name={venue.name}
+                                        address={venue.address || meetupData?.preferredArea || 'Greater Boston area'}
+                                        fairnessScore={venue.fairnessScore}
+                                        avgDistance={venue.avgDistance}
+                                        maxDistance={venue.maxDistance}
+                                        matchedPreferences={venue.matchedPreferences || []}
+                                        explanation={venue.explanation}
+                                        selected={venue.rank === selectedRank}
+                                        onSelect={() => selectVenue(venue)}
+                                        onNavigate={() => openGoogleMaps(venue)}
+                                    />
+                                ))
+                            ) : summary ? (
                                 <VenueCard
                                     rank={1}
-                                    name={venueName}
-                                    address={venueAddress}
+                                    name={meetupData?.bestPlace?.name || 'Suggested Meetup Center'}
+                                    address={meetupData?.bestPlace?.address || meetupData?.preferredArea || 'Greater Boston area'}
                                     fairnessScore={summary.fairnessScore}
                                     avgDistance={summary.avgDistance}
                                     maxDistance={summary.maxDistance}
-                                    matchedPreferences={summary.matchedPreferences}
+                                    matchedPreferences={summary.matchedPreferences || []}
                                     explanation={summary.explanation}
+                                    selected
                                 />
                             ) : (
                                 <div className="no-participants">
@@ -259,31 +471,15 @@ function Results() {
                                 </div>
                             )}
 
-                            {/* Mock venues after the real first one */}
-                            {(showAllVenues ? mockVenues.slice(0) : mockVenues.slice(0, 2)).map((venue, index) => (
-                                <VenueCard
-                                    key={venue.rank}
-                                    rank={index + 2}
-                                    name={venue.name}
-                                    address={venue.address}
-                                    fairnessScore={venue.fairnessScore}
-                                    avgDistance={venue.avgDistance}
-                                    maxDistance={venue.maxDistance}
-                                    matchedPreferences={venue.matchedPreferences}
-                                    explanation={venue.explanation}
-                                />
-                            ))}
-
-                            {/* Show more/less button */}
-                            {mockVenues.length > 2 && (
+                            {recommendations.length > 3 && (
                                 <div className="show-more-section">
                                     <button
                                         className="show-more-btn"
                                         onClick={() => setShowAllVenues(!showAllVenues)}
                                     >
                                         {showAllVenues
-                                            ? `Showing ${mockVenues.length + 1} results • Show less`
-                                            : `Showing top 3 results • More venues available in full version`
+                                            ? `Showing ${recommendations.length} results - Show less`
+                                            : 'Showing top 3 results - Show all'
                                         }
                                     </button>
                                 </div>
@@ -291,12 +487,12 @@ function Results() {
                         </div>
                     </div>
 
-                    {/* Action buttons - Avec icônes au lieu d'emojis */}
                     <div className="results-actions">
                         <Button
                             variant="primary"
                             onClick={handleRecalculate}
                             className="action-btn"
+                            loading={recalculating}
                         >
                             <ArrowPathIcon className="btn-icon-inline" />
                             Recalculate
@@ -319,20 +515,24 @@ function Results() {
                         </Button>
                     </div>
 
-                    {/* Participants section */}
                     <div className="participants-section">
                         <h2 className="participants-title">Participants in this Meetup</h2>
                         <div className="participants-grid">
-                            {meetupData?.participants?.map((participant) => (
+                            {visibleParticipants.map((participant) => (
                                 <ParticipantCard
-                                    // key={participant.id}
                                     key={participant.id || `${participant.name}-${participant.location || ''}`}
                                     name={participant.name}
                                     location={participant.location}
+                                    selected={participantKey(participant) === selectedParticipantId}
+                                    onClick={
+                                        participant.lat != null && participant.lon != null
+                                            ? () => selectParticipant(participant)
+                                            : undefined
+                                    }
                                 />
                             ))}
 
-                            {(!meetupData?.participants || meetupData.participants.length === 0) && (
+                            {visibleParticipants.length === 0 && (
                                 <div className="no-participants">
                                     <p>No participants have joined yet.</p>
                                 </div>
@@ -340,10 +540,9 @@ function Results() {
                         </div>
                     </div>
 
-                    {/* Footer note */}
                     <div className="results-footer">
                         <p className="footer-note">
-                            FairMeet — Results are based on distance calculations and preference matching
+                            FairMeet - Results are based on distance calculations and preference matching
                         </p>
                     </div>
                 </div>

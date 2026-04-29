@@ -1,5 +1,10 @@
+import os
+
 import pytest
-from app import app, meetups
+
+os.environ["FAIRMEET_STORAGE"] = "memory"
+
+from app import app
 
 
 @pytest.fixture
@@ -27,7 +32,7 @@ def test_create_meetup_success(client):
 
 
 def test_get_meetup_success(client):
-    # reuse previous meetup
+    # Uses meetup from create test
     response = client.get("/api/meetup/TEST01")
 
     assert response.status_code == 200

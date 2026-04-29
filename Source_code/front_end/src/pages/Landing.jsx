@@ -104,7 +104,7 @@ function Landing() {
 
             {/* Footer */}
             <footer className="landing-footer">
-                <p>FairMeet © 2025</p>
+                <p>FairMeet © 2026</p>
             </footer>
         </div>
     );
